@@ -15,7 +15,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   String _ketQua =
       "Hãy gõ chi tiêu của bạn vào đây.\nVí dụ: 'Trưa nay ăn phở hết 45k'";
   // Khai báo Từ điển: Chìa khóa là Tên danh mục (String), Giá trị là ID (int)
-  Map<String, int> _tuDienDanhMuc = {};
+  Map<String, dynamic> _tuDienDanhMuc = {};
 
   @override
   void initState() {
@@ -24,7 +24,6 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   }
 
   Future<void> _taiDanhSachDanhMuc() async {
-    // NHỚ THAY IP CỦA ÔNG
     final url = Uri.parse('http://172.25.91.167:1337/api/categories');
     try {
       final response = await http.get(url);
@@ -32,17 +31,24 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
         final data = json.decode(response.body);
         final List danhSach = data['data'];
 
-        // Nhặt từng món bỏ vào từ điển
         setState(() {
           for (var item in danhSach) {
-            // Strapi v5 mặc định có trường 'documentId' hoặc 'id'.
-            _tuDienDanhMuc[item['name']] = item['id'];
+            // --- THÊM DÒNG NÀY ĐỂ SOI DATA GỐC ---
+            debugPrint("🔍 SOI RAW DATA: $item");
+            // -------------------------------------
+
+            String tenDM = item['Name']?.toString() ?? 'Khác';
+            var idDM = item['documentId'] ?? item['id'];
+
+            if (idDM != null) {
+              _tuDienDanhMuc[tenDM.trim().toLowerCase()] = idDM;
+            }
           }
         });
-        debugPrint("Đã tải xong từ điển: $_tuDienDanhMuc");
+        debugPrint("📚 TỪ ĐIỂN ĐÃ TẢI THÀNH CÔNG: $_tuDienDanhMuc");
       }
     } catch (e) {
-      debugPrint("Lỗi tải danh mục: $e");
+      debugPrint("❌ Lỗi tải danh mục (sập hàm): $e");
     }
   }
 
@@ -119,50 +125,56 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   ) async {
     final url = Uri.parse('http://172.25.91.167:1337/api/transactions');
 
-    // --- TRA TỪ ĐIỂN ---
-    // Tìm ID theo tên. Nếu tên tào lao không có trong từ điển thì lấy mặc định ID 1
-    int categoryId = _tuDienDanhMuc[categoryName] ?? 1;
-    // -------------------
+    // 1. CHỐNG AI LÚ & CHỐNG SAI HOA/THƯỜNG: Cắt khoảng trắng và ép về chữ thường
+    String tenChuan = categoryName.trim().toLowerCase();
+
+    // 2. TRA TỪ ĐIỂN
+    dynamic categoryId = _tuDienDanhMuc[tenChuan];
+
+    // 3. PHAO CỨU SINH: Nếu AI trả về từ tào lao không có trong từ điển
+    // thì mình bắt nó lấy cái Danh mục ĐẦU TIÊN trong từ điển thay vì để null
+    if (categoryId == null && _tuDienDanhMuc.isNotEmpty) {
+      categoryId = _tuDienDanhMuc.values.first;
+      debugPrint(
+        "⚠️ Cảnh báo: AI trả về '$tenChuan' không có trong từ điển. Đã lấy ID mặc định!",
+      );
+    }
+
+    debugPrint(
+      "🚀 ĐANG GỬI LÊN STRAPI - Món: $note | Tiền: $amount | ID Danh mục: $categoryId",
+    );
 
     final goiHang = json.encode({
       "data": {
         "amount": amount,
         "note": note,
         "date": DateTime.now().toIso8601String(),
-        "category": categoryId, // Bắn đúng số ID động này lên!
+        "category": categoryId, // Bắn ID xịn này lên!
       },
     });
-
-    // ... code http.post ở dưới giữ nguyên
 
     try {
       final response = await http.post(
         url,
-        headers: {
-          "Content-Type":
-              "application/json", // Báo cho Server biết mình gửi file JSON
-        },
+        headers: {"Content-Type": "application/json"},
         body: goiHang,
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        // 201 là mã HTTP báo hiệu "Created" (Đã tạo thành công)
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🎉 Đã lưu vào sổ chi tiêu!'),
+              content: Text('🎉 Đã lưu vào sổ!'),
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(
-            context,
-          ); // Tự động đóng màn hình Chat, quay về Màn hình chính
+          Navigator.pop(context);
         }
       } else {
-        debugPrint("Lỗi Strapi từ chối: ${response.body}");
+        debugPrint("❌ Lỗi Strapi từ chối: ${response.body}");
       }
     } catch (e) {
-      debugPrint("Lỗi mạng không gửi được: $e");
+      debugPrint("❌ Lỗi mạng không gửi được: $e");
     }
   }
 

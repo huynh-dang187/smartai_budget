@@ -23,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> layDuLieuTuStrapi() async {
-    // ⚠️ NHỚ SỬA LẠI IP CỦA ÔNG VÀO ĐÂY NẾU CẦN
     final url = Uri.parse(
       'http://172.25.91.167:1337/api/transactions?populate=*',
     );
@@ -43,16 +42,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- HÀM TÍNH TOÁN DỮ LIỆU BIỂU ĐỒ ---
+  // --- HÀM TÍNH TOÁN DỮ LIỆU BIỂU ĐỒ (V2 - FIX LỖI ĐÈ CHỮ) ---
   List<PieChartSectionData> _taoDuLieuBieuDo() {
     Map<String, double> tongTienTheoDanhMuc = {};
+    double tongTatCa = 0; // Thêm biến tính tổng tiền
 
     // 1. Chạy vòng lặp cộng dồn tiền
     for (var gd in danhSachGiaoDich) {
       double tien = (gd['amount'] ?? 0).toDouble();
-      // Chui vào cục category để lấy tên. Nếu rỗng thì để 'Khác'
-      String tenDM = gd['category']?['name'] ?? 'Khác';
+      String tenDM = gd['category']?['Name'] ?? 'Khác';
 
       tongTienTheoDanhMuc[tenDM] = (tongTienTheoDanhMuc[tenDM] ?? 0) + tien;
+      tongTatCa += tien; // Cộng vào tổng dùng để tính %
     }
 
     // 2. Biến nó thành các mảng màu của PieChart
@@ -67,15 +68,26 @@ class _HomeScreenState extends State<HomeScreen> {
     int indexMau = 0;
 
     tongTienTheoDanhMuc.forEach((ten, tongTien) {
+      // Tính xem mảng này chiếm bao nhiêu % trong tổng chi
+      double phanTram = (tongTatCa == 0) ? 0 : (tongTien / tongTatCa);
+      bool laMangNho = phanTram < 0.15; // Nhỏ hơn 15% coi như là mảng bé
+
       cacMangMau.add(
         PieChartSectionData(
-          color: bangMau[indexMau % bangMau.length], // Đổi màu luân phiên
+          color: bangMau[indexMau % bangMau.length],
           value: tongTien,
-          title:
-              '$ten\n${(tongTien / 1000).toStringAsFixed(0)}k', // Hiện tên + số tiền rút gọn (k)
-          radius: 80, // Độ béo của vòng tròn
-          titleStyle: const TextStyle(
-            fontSize: 12,
+          title: '$ten\n${(tongTien / 1000).toStringAsFixed(0)}k',
+
+          // --- KỸ THUẬT TRÁNH ĐÈ CHỮ NẰM Ở ĐÂY ---
+          // Nếu mảng nhỏ: Bơm bán kính to ra tí (90) để nó lồi ra ngoài tạo điểm nhấn
+          radius: laMangNho ? 90 : 80,
+          // Nếu mảng nhỏ: Đẩy text ra sát mép ngoài (0.75), ngược lại để ở giữa (0.5)
+          titlePositionPercentageOffset: laMangNho ? 0.75 : 0.5,
+
+          titleStyle: TextStyle(
+            fontSize: laMangNho
+                ? 10
+                : 12, // Mảng bé thì chữ cũng phải thon thả lại
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -145,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       final ghiChu = giaoDich['note'] ?? 'Chưa có ghi chú';
                       // Lấy tên danh mục để in ra phụ đề
                       final tenDanhMuc =
-                          giaoDich['category']?['name'] ?? 'Khác';
+                          giaoDich['category']?['Name'] ?? 'Khác';
 
                       return Card(
                         margin: const EdgeInsets.symmetric(
