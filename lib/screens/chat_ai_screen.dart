@@ -14,6 +14,37 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   final TextEditingController _controller = TextEditingController();
   String _ketQua =
       "Hãy gõ chi tiêu của bạn vào đây.\nVí dụ: 'Trưa nay ăn phở hết 45k'";
+  // Khai báo Từ điển: Chìa khóa là Tên danh mục (String), Giá trị là ID (int)
+  Map<String, int> _tuDienDanhMuc = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _taiDanhSachDanhMuc(); // Vừa mở Chat là đi lấy danh mục liền
+  }
+
+  Future<void> _taiDanhSachDanhMuc() async {
+    // NHỚ THAY IP CỦA ÔNG
+    final url = Uri.parse('http://172.25.91.167:1337/api/categories');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List danhSach = data['data'];
+
+        // Nhặt từng món bỏ vào từ điển
+        setState(() {
+          for (var item in danhSach) {
+            // Strapi v5 mặc định có trường 'documentId' hoặc 'id'.
+            _tuDienDanhMuc[item['name']] = item['id'];
+          }
+        });
+        debugPrint("Đã tải xong từ điển: $_tuDienDanhMuc");
+      }
+    } catch (e) {
+      debugPrint("Lỗi tải danh mục: $e");
+    }
+  }
 
   Future<void> _guiTinNhan() async {
     final text = _controller.text;
@@ -24,34 +55,48 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     });
 
     _controller.clear(); // Xóa khung nhập
+    // Lấy tất cả tên danh mục ghép thành 1 chuỗi: "Ăn uống, Mua sắm, Tiền trọ..."
+    String cacDanhMucHienCo = _tuDienDanhMuc.keys.join(", ");
+
+    // Nếu chưa có danh mục nào thì cho mặc định
+    if (cacDanhMucHienCo.isEmpty) cacDanhMucHienCo = "Khác";
+
+    // 1. Tạo câu lệnh Prompt (CHỈ TẠO 1 LẦN Ở ĐÂY THÔI)
+    final prompt =
+        '''
+      Bạn là một trợ lý ảo quản lý chi tiêu. Người dùng vừa nhập câu sau: "$text".
+      Hãy trích xuất thông tin và CHỈ TRẢ VỀ ĐÚNG 1 CỤC JSON, tuyệt đối không giải thích gì thêm.
+      Định dạng bắt buộc:
+      {
+        "amount": (số tiền bằng số nguyên, ví dụ 45000),
+        "note": "(ghi chú ngắn gọn món đồ)",
+        "category": "(chọn 1 TRONG CÁC TỪ SAU ĐÂY: $cacDanhMucHienCo)"
+      }
+    ''';
 
     try {
-      // 1. Khai báo chìa khóa và bộ não (Dán API Key của ông vào đây)
       const apiKey = 'AIzaSyCTPn7ETrCYinik-gdXKVpMuEWraNcMumA';
       final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
 
-      // 2. KỸ THUẬT ÉP KHUÔN AI (Prompt Engineering)
-      final prompt =
-          '''
-        Bạn là một trợ lý ảo quản lý chi tiêu. Người dùng vừa nhập câu sau: "$text".
-        Hãy trích xuất thông tin và CHỈ TRẢ VỀ ĐÚNG 1 CỤC JSON, tuyệt đối không giải thích gì thêm, không dùng markdown (```json).
-        Định dạng bắt buộc:
-        {
-          "amount": (số tiền bằng số nguyên, ví dụ 45000),
-          "note": "(ghi chú ngắn gọn món đồ)",
-          "category": "(chọn 1 trong các từ sau: Ăn uống, Mua sắm, Di chuyển, Hóa đơn, Khác)"
-        }
-      ''';
-
       // 3. Gửi cho AI và chờ kết quả
       final response = await model.generateContent([Content.text(prompt)]);
-      final aiReply = response.text ?? "{}";
+      String aiReply =
+          response.text ?? "{}"; // Đổi final thành String để dễ chỉnh sửa
+
+      // --- BÙA CHỐNG LÚ CHO AI ---
+      // Lột sạch mấy cái râu ria (```json và ```) nếu AI lỡ chèn vào
+      aiReply = aiReply.replaceAll('```json', '').replaceAll('```', '').trim();
+      // ---------------------------
 
       // 4. Dịch cục text của AI thành dạng Map (JSON) trong Flutter
       final data = json.decode(aiReply);
       // Gọi lệnh gửi lên Strapi
-      await _luuGiaoDichLenStrapi(data['amount'], data['note']);
-      // 5. Hiển thị kết quả bóc tách ra màn hình để test
+      // Gọi lệnh gửi lên Strapi (truyền đủ 3 món: tiền, ghi chú, danh mục)
+      await _luuGiaoDichLenStrapi(
+        data['amount'],
+        data['note'],
+        data['category'],
+      ); // 5. Hiển thị kết quả bóc tách ra màn hình để test
       setState(() {
         _ketQua =
             "🎉 AI đã bóc tách thành công!\n\n"
@@ -67,19 +112,28 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     }
   }
 
-  Future<void> _luuGiaoDichLenStrapi(int amount, String note) async {
-    // ⚠️ NHỚ THAY IP CỦA ÔNG VÀO NHÉ
+  Future<void> _luuGiaoDichLenStrapi(
+    int amount,
+    String note,
+    String categoryName,
+  ) async {
     final url = Uri.parse('http://172.25.91.167:1337/api/transactions');
 
-    // Gói hàng theo đúng chuẩn của Strapi
+    // --- TRA TỪ ĐIỂN ---
+    // Tìm ID theo tên. Nếu tên tào lao không có trong từ điển thì lấy mặc định ID 1
+    int categoryId = _tuDienDanhMuc[categoryName] ?? 1;
+    // -------------------
+
     final goiHang = json.encode({
       "data": {
         "amount": amount,
         "note": note,
-        "date": DateTime.now().toIso8601String(), // Tự động lấy giờ hiện tại
-        // (Tạm thời mình chưa gắn Category ID để test cho lẹ nhé)
+        "date": DateTime.now().toIso8601String(),
+        "category": categoryId, // Bắn đúng số ID động này lên!
       },
     });
+
+    // ... code http.post ở dưới giữ nguyên
 
     try {
       final response = await http.post(

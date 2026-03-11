@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http; // Thư viện gọi mạng
-import 'dart:convert'; // Thư viện dịch cục JSON
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:fl_chart/fl_chart.dart'; // Thư viện Chart
+import 'dart:math'; // Random màu
 import 'chat_ai_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,29 +19,74 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    layDuLieuTuStrapi(); // Vừa mở app lên là gọi Strapi luôn
+    layDuLieuTuStrapi();
   }
 
   Future<void> layDuLieuTuStrapi() async {
-    // THAY IP CỦA ÔNG VÀO ĐÂY (Giữ nguyên cổng :1337)
+    // ⚠️ NHỚ SỬA LẠI IP CỦA ÔNG VÀO ĐÂY NẾU CẦN
     final url = Uri.parse(
       'http://172.25.91.167:1337/api/transactions?populate=*',
     );
-
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        final data = json.decode(response.body); // Dịch JSON
+        final data = json.decode(response.body);
         setState(() {
-          danhSachGiaoDich = data['data']; // Bỏ data vào danh sách
-          dangTaiDuLieu = false; // Tắt vòng xoay loading
+          danhSachGiaoDich = data['data'];
+          dangTaiDuLieu = false;
         });
       }
     } catch (e) {
-      debugPrint("Lỗi mạng gòi: $e");
+      debugPrint("Lỗi mạng: $e");
       setState(() => dangTaiDuLieu = false);
     }
   }
+
+  // --- HÀM TÍNH TOÁN DỮ LIỆU BIỂU ĐỒ ---
+  List<PieChartSectionData> _taoDuLieuBieuDo() {
+    Map<String, double> tongTienTheoDanhMuc = {};
+
+    // 1. Chạy vòng lặp cộng dồn tiền
+    for (var gd in danhSachGiaoDich) {
+      double tien = (gd['amount'] ?? 0).toDouble();
+      // Chui vào cục category để lấy tên. Nếu rỗng thì để 'Khác'
+      String tenDM = gd['category']?['name'] ?? 'Khác';
+
+      tongTienTheoDanhMuc[tenDM] = (tongTienTheoDanhMuc[tenDM] ?? 0) + tien;
+    }
+
+    // 2. Biến nó thành các mảng màu của PieChart
+    List<PieChartSectionData> cacMangMau = [];
+    final List<Color> bangMau = [
+      Colors.teal,
+      Colors.orange,
+      Colors.blue,
+      Colors.redAccent,
+      Colors.purple,
+    ];
+    int indexMau = 0;
+
+    tongTienTheoDanhMuc.forEach((ten, tongTien) {
+      cacMangMau.add(
+        PieChartSectionData(
+          color: bangMau[indexMau % bangMau.length], // Đổi màu luân phiên
+          value: tongTien,
+          title:
+              '$ten\n${(tongTien / 1000).toStringAsFixed(0)}k', // Hiện tên + số tiền rút gọn (k)
+          radius: 80, // Độ béo của vòng tròn
+          titleStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      );
+      indexMau++;
+    });
+
+    return cacMangMau;
+  }
+  // -------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -53,68 +100,101 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
       ),
       body: dangTaiDuLieu
-          ? const Center(
-              child: CircularProgressIndicator(),
-            ) // Đang tải thì xoay xoay
+          ? const Center(child: CircularProgressIndicator())
           : danhSachGiaoDich.isEmpty
           ? const Center(
               child: Text("Chưa có chi tiêu nào. Quá biết tiết kiệm!"),
             )
-          : ListView.builder(
-              itemCount: danhSachGiaoDich.length,
-              itemBuilder: (context, index) {
-                // Strapi v4 giấu data trong cái vỏ bọc tên là 'attributes'
-                // Lấy thẳng dữ liệu luôn, bỏ luôn chữ attributes
-                final giaoDich = danhSachGiaoDich[index];
-
-                // Tiện tay thêm cái dấu ?? để lỡ API nó thiếu chữ thì app cũng không bị crash
-                final soTien = giaoDich['amount'] ?? 0;
-                final ghiChu = giaoDich['note'] ?? 'Chưa có ghi chú';
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  elevation: 2,
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.teal.shade100,
-                      child: const Icon(
-                        Icons.fastfood,
-                        color: Colors.teal,
-                      ), // Tạm để icon đồ ăn
-                    ),
-                    title: Text(
-                      ghiChu,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+          : Column(
+              children: [
+                // --- KHU VỰC 1: BIỂU ĐỒ TRÒN ---
+                SizedBox(
+                  height: 250,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      PieChart(
+                        PieChartData(
+                          sections: _taoDuLieuBieuDo(),
+                          centerSpaceRadius:
+                              40, // Lỗ hổng ở giữa (Tạo thành Donut Chart)
+                          sectionsSpace: 2, // Khe hở giữa các mảng màu
+                        ),
+                        swapAnimationDuration: const Duration(
+                          milliseconds: 800,
+                        ), // Hiệu ứng xoay mượt mà
                       ),
-                    ),
-                    subtitle: const Text(
-                      'Hôm nay',
-                    ), // Mốt mình sẽ format ngày giờ sau
-                    trailing: Text(
-                      '-$soTien đ', // Hiển thị số tiền màu đỏ
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                      const Text(
+                        "Tổng chi",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                );
-              },
+                ),
+                const Divider(thickness: 2), // Đường kẻ ngang phân cách
+                // --- KHU VỰC 2: DANH SÁCH CHI TIÊU ---
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: danhSachGiaoDich.length,
+                    itemBuilder: (context, index) {
+                      final giaoDich = danhSachGiaoDich[index];
+                      final soTien = giaoDich['amount'] ?? 0;
+                      final ghiChu = giaoDich['note'] ?? 'Chưa có ghi chú';
+                      // Lấy tên danh mục để in ra phụ đề
+                      final tenDanhMuc =
+                          giaoDich['category']?['name'] ?? 'Khác';
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        elevation: 2,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.teal.shade100,
+                            child: const Icon(
+                              Icons.monetization_on,
+                              color: Colors.teal,
+                            ), // Đổi icon chung chung
+                          ),
+                          title: Text(
+                            ghiChu,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Danh mục: $tenDanhMuc',
+                          ), // Hiện rành mạch danh mục
+                          trailing: Text(
+                            '-$soTien đ',
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const ChatAIScreen()),
           );
+          layDuLieuTuStrapi(); // Chat xong tự động vẽ lại biểu đồ
         },
-        icon: const Icon(Icons.auto_awesome), // Đổi icon nhìn cho có vẻ AI xíu
+        icon: const Icon(Icons.auto_awesome),
         label: const Text('Trợ lý AI'),
       ),
     );
