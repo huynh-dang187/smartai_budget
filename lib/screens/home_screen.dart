@@ -769,17 +769,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ChatAIScreen()),
-          );
-          layDuLieuTuStrapi();
-        },
-        icon: const Icon(Icons.auto_awesome),
-        label: const Text('Trợ lý AI'),
-      ),
+      // floatingActionButton: FloatingActionButton.extended(
+      //   onPressed: () async {
+      //     await Navigator.push(
+      //       context,
+      //       MaterialPageRoute(builder: (context) => const ChatAIScreen()),
+      //     );
+      //     layDuLieuTuStrapi();
+      //   },
+      //   icon: const Icon(Icons.auto_awesome),
+      //   label: const Text('Trợ lý AI'),
+      // ),
     );
   }
 }
