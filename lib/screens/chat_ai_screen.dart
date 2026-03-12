@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:convert'; // Để xử lý cục JSON
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatAIScreen extends StatefulWidget {
   const ChatAIScreen({super.key});
@@ -24,7 +25,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   }
 
   Future<void> _taiDanhSachDanhMuc() async {
-    final url = Uri.parse('http://172.25.91.167:1337/api/categories');
+    final url = Uri.parse('http://10.185.83.167:1337/api/categories');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -81,7 +82,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     ''';
 
     try {
-      const apiKey = 'AIzaSyCTPn7ETrCYinik-gdXKVpMuEWraNcMumA';
+      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
       final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
 
       // 3. Gửi cho AI và chờ kết quả
@@ -123,7 +124,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     String note,
     String categoryName,
   ) async {
-    final url = Uri.parse('http://172.25.91.167:1337/api/transactions');
+    final url = Uri.parse('http://10.185.83.167:1337/api/transactions');
 
     // 1. CHỐNG AI LÚ & CHỐNG SAI HOA/THƯỜNG: Cắt khoảng trắng và ép về chữ thường
     String tenChuan = categoryName.trim().toLowerCase();

@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart'; // Dòng này sẽ báo lỗi đỏ gạch chân, cứ bình tĩnh!
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-void main() {
+// Đổi hàm main thành async
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Nạp két sắt lên!
+  await dotenv.load(fileName: ".env");
+
   runApp(const SmartBudgetApp());
 }
 

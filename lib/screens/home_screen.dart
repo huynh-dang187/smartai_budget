@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> layDuLieuTuStrapi() async {
     final url = Uri.parse(
-      'http://172.25.91.167:1337/api/transactions?populate=*',
+      'http://10.185.83.167:1337/api/transactions?populate=*',
     );
     try {
       final response = await http.get(url);
