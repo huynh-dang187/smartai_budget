@@ -707,6 +707,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // --- KHU VỰC 3: DANH SÁCH CHI TIÊU ---
                 Expanded(
                   child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 80),
                     itemCount: _giaoDichTrongThang.length,
                     itemBuilder: (context, index) {
                       final giaoDich = _giaoDichTrongThang[index];
