@@ -16,13 +16,17 @@ class _MainScreenState extends State<MainScreen>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
 
-  // --- BỘ ĐIỀU KHIỂN HÀO QUANG VIÊN THUỐC ---
+  // THÊM LẠI 3 DÒNG NÀY VÀO (Lúc nãy lỡ tay xóa mất)
   late AnimationController _pulseController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
 
-  final List<Widget> _pages = [
-    const HomeScreen(),
+  // 1. Cái điều khiển từ xa
+  final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
+
+  // 2. Danh sách các Tab
+  late final List<Widget> _pages = [
+    HomeScreen(key: _homeKey),
     const TransactionsScreen(),
     const BudgetScreen(),
     const Center(
@@ -167,6 +171,9 @@ class _MainScreenState extends State<MainScreen>
       MaterialPageRoute(builder: (context) => const ChatAIScreen()),
     ).then((value) {
       setState(() => _currentIndex = 0);
+
+      // THIẾU DÒNG NÀY NÈ: Dùng "điều khiển từ xa" bắt HomeScreen tải lại dữ liệu!
+      _homeKey.currentState?.layDuLieuTuStrapi();
     });
   }
 
