@@ -5,7 +5,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart'; // Format tiền và ngày tháng
 import 'package:google_generative_ai/google_generative_ai.dart'; // Não AI
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Lấy key bí mật
-
 import 'chat_ai_screen.dart';
 
 class HomeScreen extends StatefulWidget {

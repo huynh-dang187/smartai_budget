@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'chat_ai_screen.dart';
+import 'transactions_screen.dart'; // Nạp Tab Sổ thu chi
+import 'budget_screen.dart'; // Nạp Tab Ngân sách
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -21,12 +23,8 @@ class _MainScreenState extends State<MainScreen>
 
   final List<Widget> _pages = [
     const HomeScreen(),
-    const Center(
-      child: Text("🧾 Sổ thu chi chi tiết", style: TextStyle(fontSize: 18)),
-    ),
-    const Center(
-      child: Text("💰 Quản lý Ngân sách", style: TextStyle(fontSize: 18)),
-    ),
+    const TransactionsScreen(),
+    const BudgetScreen(),
     const Center(
       child: Text("⚙️ Cài đặt Cá nhân", style: TextStyle(fontSize: 18)),
     ),
