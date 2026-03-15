@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart'; // Nạp file main để lấy cái công tắc isDarkGlobal
+import 'category_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -142,15 +143,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         size: 20,
                       ),
                     ),
-                    value: _isDarkMode,
+                    value: false, // Ép nó luôn luôn tắt ở giao diện
                     activeColor: Colors.blueAccent,
                     onChanged: (bool value) {
-                      // 1. Đổi UI của chính cái nút gạt
-                      setState(() {
-                        _isDarkMode = value;
-                      });
-                      // 2. PHÁT SÓNG NGẦM RA TOÀN APP!!!
-                      isDarkGlobal.value = value;
+                      // Không đổi màu app nữa, hiện ngay cái bảng thông báo lên
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "✨ Chức năng Dark Mode đang được phát triển!",
+                          ),
+                          backgroundColor: Colors.blueAccent,
+                          behavior: SnackBarBehavior
+                              .floating, // Bảng nổi lên cho sang chảnh
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
                     },
                   ),
                 ],
@@ -236,6 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // Hàm tiện ích để vẽ các hàng Menu cực mượt
+  // Hàm tiện ích để vẽ các hàng Menu
   Widget _buildMenuRow(
     IconData icon,
     Color iconColor,
@@ -266,7 +274,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         color: Colors.grey,
       ),
       onTap: () {
-        // Todo: Xử lý sự kiện khi bấm vào menu
+        // KIỂM TRA: NẾU BẤM VÀO "QUẢN LÝ DANH MỤC" THÌ CHUYỂN TRANG
+        if (title == "Quản lý Danh mục") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CategoryManagementScreen(),
+            ),
+          );
+        }
       },
     );
   }
