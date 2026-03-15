@@ -103,7 +103,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
     });
   }
 
-  // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN
   // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN (ĐÃ FIX LỖI 0 ĐỒNG)
   Future<void> _dongBoDuLieuTuStrapi() async {
     final url = Uri.parse(
