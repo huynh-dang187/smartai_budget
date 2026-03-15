@@ -3,6 +3,7 @@ import 'home_screen.dart';
 import 'chat_ai_screen.dart';
 import 'transactions_screen.dart'; // Nạp Tab Sổ thu chi
 import 'budget_screen.dart'; // Nạp Tab Ngân sách
+import 'settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -29,9 +30,7 @@ class _MainScreenState extends State<MainScreen>
     HomeScreen(key: _homeKey),
     const TransactionsScreen(),
     const BudgetScreen(),
-    const Center(
-      child: Text("⚙️ Cài đặt Cá nhân", style: TextStyle(fontSize: 18)),
-    ),
+    const SettingsScreen(),
   ];
 
   @override
