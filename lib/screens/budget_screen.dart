@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart'; // <--- Thêm thư viện này để bắt sự kiện gõ phím
+import 'package:flutter/services.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -16,39 +16,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
   bool _dangTai = true;
   late SharedPreferences _prefs;
 
-  double tongNganSach = 5000000;
+  double tongNganSach = 0.0;
   double tongDaTieu = 0.0;
 
-  List<Map<String, dynamic>> danhSachNganSach = [
-    {
-      "ten": "Ăn uống",
-      "daTieu": 0.0,
-      "hanMuc": 2500000.0,
-      "icon": Icons.fastfood_rounded,
-      "mauIcon": Colors.orange,
-    },
-    {
-      "ten": "Giải Trí",
-      "daTieu": 0.0,
-      "hanMuc": 1000000.0,
-      "icon": Icons.sports_esports_rounded,
-      "mauIcon": Colors.purple,
-    },
-    {
-      "ten": "Học Phí",
-      "daTieu": 0.0,
-      "hanMuc": 1000000.0,
-      "icon": Icons.menu_book_rounded,
-      "mauIcon": Colors.blue,
-    },
-    {
-      "ten": "Khác",
-      "daTieu": 0.0,
-      "hanMuc": 500000.0,
-      "icon": Icons.category_rounded,
-      "mauIcon": Colors.grey,
-    },
-  ];
+  // Xóa sạch Hard-code! Giờ nó là một mảng rỗng đợi Strapi rót data vào
+  List<Map<String, dynamic>> danhSachNganSach = [];
 
   @override
   void initState() {
@@ -56,12 +28,68 @@ class _BudgetScreenState extends State<BudgetScreen> {
     _khoiTaoDuLieu();
   }
 
+  // --- COMBO 3 BƯỚC KHỞI TẠO ĐỘNG ---
   Future<void> _khoiTaoDuLieu() async {
     _prefs = await SharedPreferences.getInstance();
-    _taiHanMucDaLuu();
-    await _dongBoDuLieuTuStrapi();
+    await _taiDanhSachDanhMucTuStrapi(); // Bước 1: Kéo danh mục từ mây về
+    _taiHanMucDaLuu(); // Bước 2: Gắn hạn mức từ két sắt
+    await _dongBoDuLieuTuStrapi(); // Bước 3: Kéo thu chi về để tính toán
   }
 
+  // BƯỚC 1: LẤY DANH MỤC (MỚI)
+  Future<void> _taiDanhSachDanhMucTuStrapi() async {
+    final url = Uri.parse('http://10.185.83.167:1337/api/categories');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List categories = data['data'];
+
+        List<Map<String, dynamic>> dmTam = [];
+        for (var item in categories) {
+          final attrs = item['attributes'] ?? item;
+          String tenDM = attrs['Name'] ?? 'Khác';
+
+          // Gán Icon tự động dựa theo tên cho nó sinh động
+          IconData icon = Icons.category_rounded;
+          Color mau = Colors.blueGrey;
+          String tenToLowerCase = tenDM.toLowerCase();
+
+          if (tenToLowerCase.contains('ăn')) {
+            icon = Icons.fastfood_rounded;
+            mau = Colors.orange;
+          } else if (tenToLowerCase.contains('giải') ||
+              tenToLowerCase.contains('chơi')) {
+            icon = Icons.sports_esports_rounded;
+            mau = Colors.purple;
+          } else if (tenToLowerCase.contains('học')) {
+            icon = Icons.school_rounded;
+            mau = Colors.blue;
+          } else if (tenToLowerCase.contains('nhà') ||
+              tenToLowerCase.contains('trọ')) {
+            icon = Icons.home_rounded;
+            mau = Colors.teal;
+          }
+
+          dmTam.add({
+            "ten": tenDM,
+            "daTieu": 0.0,
+            "hanMuc": 1000000.0, // Mặc định cho mọi danh mục mới là 1 củ
+            "icon": icon,
+            "mauIcon": mau,
+          });
+        }
+
+        setState(() {
+          danhSachNganSach = dmTam;
+        });
+      }
+    } catch (e) {
+      debugPrint("Lỗi tải danh mục: $e");
+    }
+  }
+
+  // BƯỚC 2: GẮN HẠN MỨC
   void _taiHanMucDaLuu() {
     double tongMoi = 0;
     for (var nganSach in danhSachNganSach) {
@@ -75,11 +103,72 @@ class _BudgetScreenState extends State<BudgetScreen> {
     });
   }
 
-  // --- BẢNG TÙY CHỈNH HẠN MỨC (ĐÃ NÂNG CẤP AUTO FORMAT) ---
+  // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN
+  // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN (ĐÃ FIX LỖI 0 ĐỒNG)
+  Future<void> _dongBoDuLieuTuStrapi() async {
+    final url = Uri.parse(
+      'http://10.185.83.167:1337/api/transactions?populate=*',
+    );
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List giaoDich = data['data'];
+
+        DateTime now = DateTime.now();
+        double tongTienThangNay = 0;
+
+        Map<String, double> tienTheoDanhMuc = {};
+
+        for (var gd in giaoDich) {
+          final attrs = gd['attributes'] ?? gd;
+          if (attrs['date'] == null) continue;
+          DateTime dt = DateTime.parse(attrs['date']).toLocal();
+
+          if (dt.month == now.month && dt.year == now.year) {
+            double tien = (attrs['amount'] ?? 0).toDouble();
+            tongTienThangNay += tien;
+
+            // --- ĐOẠN FIX LỖI Ở ĐÂY: Dùng lại logic đọc JSON chuẩn xác của ông ---
+            String tenDM = 'Khác';
+            if (attrs['category'] != null) {
+              var cat = attrs['category'];
+              // Thử đọc kiểu cũ của ông (Không có data/attributes)
+              if (cat['Name'] != null) {
+                tenDM = cat['Name'];
+              }
+              // Thử đọc kiểu Strapi v4 gốc (nếu có)
+              else if (cat['data'] != null) {
+                tenDM =
+                    (cat['data']['attributes'] ?? cat['data'])['Name'] ??
+                    'Khác';
+              }
+            }
+            // ----------------------------------------------------------------------
+
+            tienTheoDanhMuc[tenDM] = (tienTheoDanhMuc[tenDM] ?? 0) + tien;
+          }
+        }
+
+        setState(() {
+          tongDaTieu = tongTienThangNay;
+          // Áp tiền đã tiêu vào đúng danh mục động
+          for (var nganSach in danhSachNganSach) {
+            nganSach['daTieu'] = tienTheoDanhMuc[nganSach['ten']] ?? 0.0;
+          }
+          _dangTai = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Lỗi đồng bộ giao dịch: $e");
+      setState(() => _dangTai = false);
+    }
+  }
+
+  // --- BẢNG TÙY CHỈNH HẠN MỨC (TỰ ĐỘNG THÍCH ỨNG VỚI DANH MỤC MỚI) ---
   void _hienThiBangSuaHanMuc() {
     Map<String, TextEditingController> controllers = {};
     for (var ns in danhSachNganSach) {
-      // Ép dữ liệu cũ hiển thị sẵn dấu chấm (VD: 2.500.000)
       String soTienCu = NumberFormat(
         '#,###',
         'vi_VN',
@@ -128,24 +217,17 @@ class _BudgetScreenState extends State<BudgetScreen> {
                     child: TextField(
                       controller: controllers[ns['ten']],
                       keyboardType: TextInputType.number,
-                      // NHÚNG BỘ LỌC VÀO ĐÂY: Chỉ cho nhập số và tự động phẩy
                       inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly, // Chặn nhập chữ
-                        CurrencyInputFormatter(), // Tự động thêm dấu chấm
+                        FilteringTextInputFormatter.digitsOnly,
+                        CurrencyInputFormatter(),
                       ],
                       decoration: InputDecoration(
                         labelText: "Hạn mức ${ns['ten']}",
                         prefixIcon: Icon(ns['icon'], color: ns['mauIcon']),
                         suffixText: "VNĐ",
                         suffixIcon: IconButton(
-                          icon: const Icon(
-                            Icons.close,
-                            color: Color.fromARGB(255, 82, 80, 76),
-                          ),
-                          onPressed: () {
-                            controllers[ns['ten']]!
-                                .clear(); // Xóa trắng ô nhập trong 1 nốt nhạc
-                          },
+                          icon: const Icon(Icons.cancel, color: Colors.grey),
+                          onPressed: () => controllers[ns['ten']]!.clear(),
                         ),
                         filled: true,
                         fillColor: Colors.grey.shade50,
@@ -170,27 +252,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   ),
                   onPressed: () async {
                     double tongTienMoi = 0;
-
                     for (var ns in danhSachNganSach) {
-                      // TRƯỚC KHI LƯU: Phải lột sạch dấu chấm đi mới ép kiểu về double được
                       String chuoiSoSanh = controllers[ns['ten']]!.text
                           .replaceAll(RegExp(r'[^0-9]'), '');
                       double val = double.tryParse(chuoiSoSanh) ?? 0.0;
-
                       ns['hanMuc'] = val;
                       tongTienMoi += val;
                       await _prefs.setDouble('hanMuc_${ns['ten']}', val);
                     }
-
                     setState(() {
                       tongNganSach = tongTienMoi;
                     });
-
                     if (context.mounted) {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text("✨ Đã lưu cấu hình ngân sách mới!"),
+                          content: Text("✨ Đã lưu cấu hình ngân sách!"),
                           backgroundColor: Colors.green,
                         ),
                       );
@@ -214,62 +291,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
     );
   }
 
-  // --- HÀM ĐỒNG BỘ STRAPI ---
-  Future<void> _dongBoDuLieuTuStrapi() async {
-    final url = Uri.parse(
-      'http://10.185.83.167:1337/api/transactions?populate=*',
-    );
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List giaoDich = data['data'];
-
-        DateTime now = DateTime.now();
-        double tongTienThangNay = 0;
-
-        Map<String, double> tienTheoDanhMuc = {
-          "Ăn uống": 0,
-          "Giải Trí": 0,
-          "Học Phí": 0,
-          "Khác": 0,
-        };
-
-        for (var gd in giaoDich) {
-          if (gd['date'] == null) continue;
-          DateTime dt = DateTime.parse(gd['date']).toLocal();
-
-          if (dt.month == now.month && dt.year == now.year) {
-            double tien = (gd['amount'] ?? 0).toDouble();
-            tongTienThangNay += tien;
-
-            String tenDM = gd['category']?['Name'] ?? 'Khác';
-            if (tienTheoDanhMuc.containsKey(tenDM)) {
-              tienTheoDanhMuc[tenDM] = tienTheoDanhMuc[tenDM]! + tien;
-            } else {
-              tienTheoDanhMuc["Khác"] = tienTheoDanhMuc["Khác"]! + tien;
-            }
-          }
-        }
-
-        setState(() {
-          tongDaTieu = tongTienThangNay;
-          for (var nganSach in danhSachNganSach) {
-            String ten = nganSach['ten'];
-            nganSach['daTieu'] = tienTheoDanhMuc[ten] ?? 0.0;
-          }
-          _dangTai = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Lỗi đồng bộ: $e");
-      setState(() => _dangTai = false);
-    }
-  }
-
-  String _formatTien(num tien) {
-    return NumberFormat.currency(locale: 'vi_VN', symbol: 'đ').format(tien);
-  }
+  String _formatTien(num tien) =>
+      NumberFormat.currency(locale: 'vi_VN', symbol: 'đ').format(tien);
 
   Widget _veThanhTienTrinh(double daTieu, double hanMuc) {
     double phanTram = hanMuc <= 0 ? 0.0 : daTieu / hanMuc;
@@ -340,7 +363,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
             icon: const Icon(Icons.sync, color: Colors.blueAccent, size: 28),
             onPressed: () {
               setState(() => _dangTai = true);
-              _dongBoDuLieuTuStrapi();
+              _khoiTaoDuLieu(); // Load lại toàn bộ Combo
             },
           ),
         ],
@@ -434,7 +457,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         ),
                         const Spacer(),
                         TextButton.icon(
-                          onPressed: _hienThiBangSuaHanMuc,
+                          onPressed: danhSachNganSach.isEmpty
+                              ? null
+                              : _hienThiBangSuaHanMuc,
                           icon: const Icon(Icons.edit_rounded, size: 18),
                           label: const Text(
                             'Chỉnh sửa',
@@ -444,6 +469,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       ],
                     ),
                   ),
+                  if (danhSachNganSach.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(30),
+                      child: Text(
+                        "Chưa có danh mục nào. Hãy vào Cài đặt để thêm!",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
                   ...danhSachNganSach.map((nganSach) {
                     return Container(
                       margin: const EdgeInsets.symmetric(
@@ -515,31 +548,20 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 }
 
-// ==========================================
-// CLASS CHUYÊN DỤNG ĐỂ AUTO FORMAT TIỀN TỆ
-// ==========================================
 class CurrencyInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (newValue.text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
-
-    // Lột sạch mọi thứ, chỉ giữ lại số
+    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
     String digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digitsOnly.isEmpty) return newValue.copyWith(text: '');
-
-    // Dùng thư viện intl để nhét dấu chấm vào giữa các số
     final int value = int.parse(digitsOnly);
     final String formatted = NumberFormat(
       '#,###',
       'vi_VN',
     ).format(value).replaceAll(',', '.');
-
-    // Trả lại text đã format và đẩy con trỏ chuột về cuối dòng
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
