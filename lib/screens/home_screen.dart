@@ -5,7 +5,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart'; // Format tiền và ngày tháng
 import 'package:google_generative_ai/google_generative_ai.dart'; // Não AI
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Lấy key bí mật
-import 'chat_ai_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +19,9 @@ class HomeScreenState extends State<HomeScreen> {
 
   // 1. Biến lưu giữ Tháng/Năm hiện tại
   DateTime _thangHienTai = DateTime.now();
+
+  // --- TỪ ĐIỂN GIAO DIỆN (LƯU ICON VÀ MÀU TỪ STRAPI) ---
+  final Map<String, Map<String, dynamic>> _tuDienGiaoDien = {};
 
   // 2. BỘ LỌC THÔNG MINH: Chỉ lấy giao dịch của đúng tháng đang chọn
   List get _giaoDichTrongThang {
@@ -37,7 +39,61 @@ class HomeScreenState extends State<HomeScreen> {
     layDuLieuTuStrapi();
   }
 
+  // --- BƯỚC 1: LẤY BỘ NHẬN DIỆN THƯƠNG HIỆU TỪ STRAPI ---
+  Future<void> _taiDanhMucDeLayMauVaIcon() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.185.83.167:1337/api/categories'),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+        for (var item in data) {
+          final attrs = item['attributes'] ?? item;
+          String tenDM = attrs['Name'] ?? 'Khác';
+          String tenKey = tenDM.toLowerCase().trim();
+
+          int? codePoint = int.tryParse(attrs['Icon'] ?? '');
+          IconData iconData = codePoint != null
+              ? IconData(codePoint, fontFamily: 'MaterialIcons')
+              : Icons.category_rounded;
+
+          String colorStr = attrs['Color'] ?? '';
+          Color colorData = Colors.blueGrey;
+          if (colorStr.isNotEmpty) {
+            try {
+              colorData = Color(int.parse(colorStr, radix: 16));
+            } catch (e) {}
+          }
+
+          if (codePoint == null || colorStr.isEmpty) {
+            if (tenKey.contains('ăn')) {
+              iconData = Icons.fastfood_rounded;
+              colorData = Colors.orange;
+            } else if (tenKey.contains('giải') || tenKey.contains('chơi')) {
+              iconData = Icons.sports_esports_rounded;
+              colorData = Colors.purple;
+            } else if (tenKey.contains('học')) {
+              iconData = Icons.school_rounded;
+              colorData = Colors.blue;
+            } else if (tenKey.contains('nhà') ||
+                tenKey.contains('trọ') ||
+                tenKey.contains('wifi')) {
+              iconData = Icons.home_rounded;
+              colorData = Colors.teal;
+            }
+          }
+          _tuDienGiaoDien[tenKey] = {'icon': iconData, 'color': colorData};
+        }
+      }
+    } catch (e) {
+      debugPrint("Lỗi tải danh mục: $e");
+    }
+  }
+
+  // --- BƯỚC 2: KÉO GIAO DỊCH VỀ ---
   Future<void> layDuLieuTuStrapi() async {
+    await _taiDanhMucDeLayMauVaIcon(); // Bắt buộc nạp từ điển trước khi kéo giao dịch!
+
     final url = Uri.parse(
       'http://10.185.83.167:1337/api/transactions?populate=*', // Nhớ check lại IP mỗi ngày
     );
@@ -56,21 +112,29 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- HÀM TÍNH TOÁN DỮ LIỆU BIỂU ĐỒ (Chống đè chữ) ---
+  // --- HÀM TÍNH TOÁN DỮ LIỆU BIỂU ĐỒ (ĐÃ ĐỒNG BỘ MÀU) ---
   List<PieChartSectionData> _taoDuLieuBieuDo() {
     Map<String, double> tongTienTheoDanhMuc = {};
     double tongTatCa = 0;
 
     for (var gd in _giaoDichTrongThang) {
       double tien = (gd['amount'] ?? 0).toDouble();
-      String tenDM = gd['category']?['Name'] ?? 'Khác';
+      String tenDM = 'Khác';
+      if (gd['category'] != null) {
+        var cat = gd['category'];
+        if (cat['Name'] != null) {
+          tenDM = cat['Name'];
+        } else if (cat['data'] != null) {
+          tenDM = (cat['data']['attributes'] ?? cat['data'])['Name'] ?? 'Khác';
+        }
+      }
 
       tongTienTheoDanhMuc[tenDM] = (tongTienTheoDanhMuc[tenDM] ?? 0) + tien;
       tongTatCa += tien;
     }
 
     List<PieChartSectionData> cacMangMau = [];
-    final List<Color> bangMau = [
+    final List<Color> bangMauBackup = [
       Colors.teal,
       Colors.orange,
       Colors.blue,
@@ -83,9 +147,15 @@ class HomeScreenState extends State<HomeScreen> {
       double phanTram = (tongTatCa == 0) ? 0 : (tongTien / tongTatCa);
       bool laMangNho = phanTram < 0.15;
 
+      // Tra từ điển lấy màu
+      String tenKey = ten.toLowerCase().trim();
+      Color mauChuan =
+          _tuDienGiaoDien[tenKey]?['color'] ??
+          bangMauBackup[indexMau % bangMauBackup.length];
+
       cacMangMau.add(
         PieChartSectionData(
-          color: bangMau[indexMau % bangMau.length],
+          color: mauChuan,
           value: tongTien,
           title: '$ten\n${(tongTien / 1000).toStringAsFixed(0)}k',
           radius: laMangNho ? 90 : 80,
@@ -122,10 +192,15 @@ class HomeScreenState extends State<HomeScreen> {
 
     try {
       String dataChiTieu = _giaoDichTrongThang
-          .map(
-            (gd) =>
-                "- ${gd['note']}: ${(gd['amount'] ?? 0)} VNĐ (Mục: ${gd['category']?['Name'] ?? 'Khác'})",
-          )
+          .map((gd) {
+            String tenDM = gd['category'] != null
+                ? (gd['category']['Name'] ??
+                      (gd['category']['data'] != null
+                          ? gd['category']['data']['attributes']['Name']
+                          : 'Khác'))
+                : 'Khác';
+            return "- ${gd['note']}: ${(gd['amount'] ?? 0)} VNĐ (Mục: $tenDM)";
+          })
           .join('\n');
 
       final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
@@ -206,7 +281,17 @@ class HomeScreenState extends State<HomeScreen> {
     String idGiaoDich,
   ) {
     final ghiChu = giaoDich['note'] ?? 'Chưa có ghi chú';
-    final tenDanhMuc = giaoDich['category']?['Name'] ?? 'Khác';
+    String tenDanhMuc = 'Khác';
+    if (giaoDich['category'] != null) {
+      var cat = giaoDich['category'];
+      if (cat['Name'] != null) {
+        tenDanhMuc = cat['Name'];
+      } else if (cat['data'] != null) {
+        tenDanhMuc =
+            (cat['data']['attributes'] ?? cat['data'])['Name'] ?? 'Khác';
+      }
+    }
+
     DateTime dt = DateTime.parse(giaoDich['date']).toLocal();
     String ngayGio = DateFormat('dd/MM/yyyy - HH:mm').format(dt);
 
@@ -218,7 +303,6 @@ class HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(24),
-          // height: 380,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -317,10 +401,7 @@ class HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       onPressed: () {
-                        // 1. Đóng cái bảng Bottom Sheet hiện tại lại
                         Navigator.pop(context);
-
-                        // 2. Mở cái bảng Edit (Dialog) lên
                         _hienThiDialogSua(giaoDich, idGiaoDich);
                       },
                     ),
@@ -346,7 +427,6 @@ class HomeScreenState extends State<HomeScreen> {
                       ),
                       onPressed: () async {
                         Navigator.pop(context); // Đóng bảng
-                        // GỌI API XÓA
                         final deleteUrl = Uri.parse(
                           'http://10.185.83.167:1337/api/transactions/$idGiaoDich',
                         );
@@ -377,9 +457,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   // --- HÀM 4: BẢNG CHỈNH SỬA GIAO DỊCH ---
-  // --- HÀM 4: BẢNG CHỈNH SỬA GIAO DỊCH (Có sửa thời gian) ---
   void _hienThiDialogSua(dynamic giaoDich, String idGiaoDich) {
-    // 1. Lấy dữ liệu cũ
     final TextEditingController tienController = TextEditingController(
       text: giaoDich['amount'].toString(),
     );
@@ -387,13 +465,11 @@ class HomeScreenState extends State<HomeScreen> {
       text: giaoDich['note'] ?? '',
     );
 
-    // Ép kiểu thời gian từ Strapi thành giờ địa phương để chuẩn bị sửa
     DateTime thoiGianDuKien = DateTime.parse(giaoDich['date']).toLocal();
 
     showDialog(
       context: context,
       builder: (context) {
-        // StatefulBuilder giúp Dialog tự động cập nhật UI khi ông đổi ngày giờ
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
@@ -411,9 +487,8 @@ class HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               content: Column(
-                mainAxisSize: MainAxisSize.min, // Chống tràn viền vàng đen
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // --- Ô NHẬP TIỀN ---
                   TextField(
                     controller: tienController,
                     keyboardType: TextInputType.number,
@@ -429,8 +504,6 @@ class HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 15),
-
-                  // --- Ô NHẬP GHI CHÚ ---
                   TextField(
                     controller: ghiChuController,
                     decoration: InputDecoration(
@@ -445,28 +518,23 @@ class HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 15),
-
-                  // --- NÚT CHỌN THỜI GIAN CỰC XỊN ---
                   InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () async {
-                      // BƯỚC 1: Hiện lịch chọn Ngày
                       DateTime? ngayMoi = await showDatePicker(
                         context: context,
                         initialDate: thoiGianDuKien,
-                        firstDate: DateTime(2000), // Cho lùi về năm 2000
-                        lastDate: DateTime(2100), // Cho tiến tới năm 2100
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
                       );
 
                       if (ngayMoi != null) {
-                        // BƯỚC 2: Hiện đồng hồ chọn Giờ
                         TimeOfDay? gioMoi = await showTimePicker(
                           context: context,
                           initialTime: TimeOfDay.fromDateTime(thoiGianDuKien),
                         );
 
                         if (gioMoi != null) {
-                          // BƯỚC 3: Cập nhật lại thời gian dự kiến
                           setStateDialog(() {
                             thoiGianDuKien = DateTime(
                               ngayMoi.year,
@@ -517,9 +585,7 @@ class HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   onPressed: () async {
-                    Navigator.pop(context); // Đóng popup
-
-                    // 2. GỌI API CẬP NHẬT LÊN STRAPI (Kẹp thêm cái 'date' vào body)
+                    Navigator.pop(context);
                     final putUrl = Uri.parse(
                       'http://10.185.83.167:1337/api/transactions/$idGiaoDich',
                     );
@@ -531,7 +597,6 @@ class HomeScreenState extends State<HomeScreen> {
                           "data": {
                             "amount": int.tryParse(tienController.text) ?? 0,
                             "note": ghiChuController.text,
-                            // Convert giờ địa phương về chuẩn ISO (UTC) để Strapi dễ hiểu
                             "date": thoiGianDuKien.toUtc().toIso8601String(),
                           },
                         }),
@@ -546,7 +611,7 @@ class HomeScreenState extends State<HomeScreen> {
                             ),
                           );
                         }
-                        layDuLieuTuStrapi(); // Vẽ lại giao diện
+                        layDuLieuTuStrapi();
                       }
                     } catch (e) {
                       debugPrint("Lỗi cập nhật: $e");
@@ -578,7 +643,6 @@ class HomeScreenState extends State<HomeScreen> {
         ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
-        // NÚT BẤM GỌI CỐ VẤN AI
         actions: [
           IconButton(
             icon: const Icon(Icons.psychology, size: 28),
@@ -703,25 +767,45 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const Divider(thickness: 2),
-                // --- KHU VỰC 3: DANH SÁCH CHI TIÊU ---
+                // --- KHU VỰC 3: DANH SÁCH CHI TIÊU ĐÃ ĐỒNG BỘ ---
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.only(bottom: 80),
                     itemCount: _giaoDichTrongThang.length,
                     itemBuilder: (context, index) {
                       final giaoDich = _giaoDichTrongThang[index];
-                      final idGiaoDich = giaoDich['documentId'].toString();
+                      final idGiaoDich =
+                          giaoDich['documentId']?.toString() ??
+                          giaoDich['id'].toString();
                       final soTien = giaoDich['amount'] ?? 0;
                       final ghiChu = giaoDich['note'] ?? 'Chưa có ghi chú';
-                      final tenDanhMuc =
-                          giaoDich['category']?['Name'] ?? 'Khác';
+
+                      String tenDanhMuc = 'Khác';
+                      if (giaoDich['category'] != null) {
+                        var cat = giaoDich['category'];
+                        if (cat['Name'] != null) {
+                          tenDanhMuc = cat['Name'];
+                        } else if (cat['data'] != null) {
+                          tenDanhMuc =
+                              (cat['data']['attributes'] ??
+                                  cat['data'])['Name'] ??
+                              'Khác';
+                        }
+                      }
 
                       final formatTien = NumberFormat.currency(
                         locale: 'vi_VN',
                         symbol: 'đ',
                       ).format(soTien);
 
-                      // DÙNG INKWELL ĐỂ TẠO HIỆU ỨNG CHẠM GỌI BOTTOM SHEET
+                      // --- TRA TỪ ĐIỂN LẤY ICON VÀ MÀU ---
+                      final tenKey = tenDanhMuc.toLowerCase().trim();
+                      final iconChuan =
+                          _tuDienGiaoDien[tenKey]?['icon'] ??
+                          Icons.receipt_long;
+                      final mauChuan =
+                          _tuDienGiaoDien[tenKey]?['color'] ?? Colors.teal;
+
                       return InkWell(
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
@@ -739,10 +823,12 @@ class HomeScreenState extends State<HomeScreen> {
                           elevation: 2,
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: Colors.teal.shade100,
-                              child: const Icon(
-                                Icons.monetization_on,
-                                color: Colors.teal,
+                              backgroundColor: mauChuan.withOpacity(
+                                0.2,
+                              ), // Màu từ Strapi
+                              child: Icon(
+                                iconChuan, // Icon từ Strapi
+                                color: mauChuan,
                               ),
                             ),
                             title: Text(
@@ -769,17 +855,6 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-      // floatingActionButton: FloatingActionButton.extended(
-      //   onPressed: () async {
-      //     await Navigator.push(
-      //       context,
-      //       MaterialPageRoute(builder: (context) => const ChatAIScreen()),
-      //     );
-      //     layDuLieuTuStrapi();
-      //   },
-      //   icon: const Icon(Icons.auto_awesome),
-      //   label: const Text('Trợ lý AI'),
-      // ),
     );
   }
 }

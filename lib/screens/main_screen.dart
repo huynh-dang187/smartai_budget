@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
+import 'home_screen.dart'; // Đã gọi đúng HomeScreen của ông!
 import 'chat_ai_screen.dart';
-import 'transactions_screen.dart'; // Nạp Tab Sổ thu chi
-import 'budget_screen.dart'; // Nạp Tab Ngân sách
+import 'transactions_screen.dart';
+import 'budget_screen.dart';
 import 'settings_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
   @override
-  // Phải có cái này để chạy Animation
   State<MainScreen> createState() => _MainScreenState();
 }
 
@@ -17,17 +16,13 @@ class _MainScreenState extends State<MainScreen>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
 
-  // THÊM LẠI 3 DÒNG NÀY VÀO (Lúc nãy lỡ tay xóa mất)
   late AnimationController _pulseController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
 
-  // 1. Cái điều khiển từ xa
-  final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
-
-  // 2. Danh sách các Tab
-  late final List<Widget> _pages = [
-    HomeScreen(key: _homeKey),
+  // Dùng UniqueKey để ép HomeScreen gọi API mỗi khi mở lại
+  late List<Widget> _pages = [
+    HomeScreen(key: UniqueKey()),
     const TransactionsScreen(),
     const BudgetScreen(),
     const SettingsScreen(),
@@ -36,19 +31,14 @@ class _MainScreenState extends State<MainScreen>
   @override
   void initState() {
     super.initState();
-    // 1. Nhịp thở chậm rãi (2 giây) lặp vô tận
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat();
-
-    // 2. Phình to ra khoảng 1.5 lần
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: 1.5,
     ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
-
-    // 3. Mờ dần từ 0.4 xuống 0
     _opacityAnimation = Tween<double>(
       begin: 0.4,
       end: 0.0,
@@ -67,12 +57,10 @@ class _MainScreenState extends State<MainScreen>
       backgroundColor: Colors.grey.shade50,
       body: _pages[_currentIndex],
 
-      // --- CỤM NÚT VIÊN THUỐC TỎA SÁNG ---
       floatingActionButton: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          // 1. LỚP HÀO QUANG (Chỉ hiện ở Tab Trang chủ)
           if (_currentIndex == 0)
             AnimatedBuilder(
               animation: _pulseController,
@@ -81,13 +69,11 @@ class _MainScreenState extends State<MainScreen>
                   scale: _scaleAnimation.value,
                   child: Opacity(
                     opacity: _opacityAnimation.value,
-                    // Dùng một cái nút giả để tạo hình dáng hào quang y hệt nút thật
                     child: FloatingActionButton.extended(
                       heroTag: null,
                       onPressed: null,
                       backgroundColor: Colors.blueAccent,
                       elevation: 0,
-                      // Nội dung trong suốt để chỉ lấy cái vỏ
                       label: const Text(
                         "Nhập AI",
                         style: TextStyle(color: Colors.transparent),
@@ -102,33 +88,30 @@ class _MainScreenState extends State<MainScreen>
               },
             ),
 
-          // 2. NÚT BẤM THẬT (Nhỏ gọn hơn)
           _currentIndex == 0
               ? FloatingActionButton.extended(
                   backgroundColor: Colors.blueAccent,
                   elevation: 4,
                   onPressed: () => _goiAI(context),
-                  // Tinh chỉnh cho nhỏ lại:
                   extendedPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 0,
-                  ), // Bóp gọn 2 bên
+                  ),
                   icon: const Icon(
                     Icons.auto_awesome,
                     color: Colors.white,
                     size: 20,
-                  ), // Icon nhỏ đi (chuẩn là 24)
+                  ),
                   label: const Text(
                     "Nhập bằng AI",
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                    ), // Chữ nhỏ lại (chuẩn là 14-15)
+                    ),
                   ),
                 )
               : FloatingActionButton(
-                  // Nút tròn khi sang tab khác
                   backgroundColor: Colors.blueAccent,
                   elevation: 4,
                   onPressed: () => _goiAI(context),
@@ -136,10 +119,8 @@ class _MainScreenState extends State<MainScreen>
                 ),
         ],
       ),
-
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
 
-      // --- THANH ĐIỀU HƯỚNG ---
       bottomNavigationBar: BottomAppBar(
         color: Colors.white,
         elevation: 15,
@@ -163,16 +144,17 @@ class _MainScreenState extends State<MainScreen>
     );
   }
 
-  // ... (Giữ nguyên 2 hàm _goiAI và _buildNavItem ở dưới)
   void _goiAI(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ChatAIScreen()),
     ).then((value) {
-      setState(() => _currentIndex = 0);
-
-      // THIẾU DÒNG NÀY NÈ: Dùng "điều khiển từ xa" bắt HomeScreen tải lại dữ liệu!
-      _homeKey.currentState?.layDuLieuTuStrapi();
+      setState(() {
+        _currentIndex = 0;
+        _pages[0] = HomeScreen(
+          key: UniqueKey(),
+        ); // Ép HomeScreen "tái sinh" lấy data mới!
+      });
     });
   }
 
