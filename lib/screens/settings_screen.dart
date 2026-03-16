@@ -1,3 +1,10 @@
+import 'package:excel/excel.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import '../main.dart'; // Nạp file main để lấy cái công tắc isDarkGlobal
 import 'category_management_screen.dart';
@@ -12,6 +19,101 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // Biến tạm để làm UI cái công tắc bật/tắt (Lát mình sẽ nâng cấp nó thành biến Global)
   bool _isDarkMode = false;
+  // --- NHÀ MÁY SẢN XUẤT EXCEL ---
+  Future<void> _xuatBaoCaoExcel() async {
+    // 1. Hiện vòng xoay loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 2. Lấy toàn bộ giao dịch từ Strapi
+      final url = Uri.parse(
+        'http://10.185.83.167:1337/api/transactions?populate=*',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List giaoDich = data['data'];
+
+        // 3. Khởi tạo file Excel
+        var excel = Excel.createExcel();
+        Sheet sheetObject = excel['Báo cáo chi tiêu']; // Tạo sheet mới
+        excel.setDefaultSheet('Báo cáo chi tiêu');
+
+        // Kẻ dòng Tiêu đề (Header)
+        sheetObject.appendRow([
+          TextCellValue('Ngày tháng'),
+          TextCellValue('Danh mục'),
+          TextCellValue('Số tiền (VNĐ)'),
+          TextCellValue('Ghi chú'),
+        ]);
+
+        // Đổ data vào từng dòng
+        for (var gd in giaoDich) {
+          final attrs = gd['attributes'] ?? gd;
+
+          // Lấy Ngày
+          String ngay = '';
+          if (attrs['date'] != null) {
+            DateTime dt = DateTime.parse(attrs['date']).toLocal();
+            ngay = DateFormat('dd/MM/yyyy HH:mm').format(dt);
+          }
+
+          // Lấy Tên Danh Mục (Fix chuẩn logic AI)
+          String tenDM = 'Khác';
+          if (attrs['category'] != null) {
+            var cat = attrs['category'];
+            if (cat['Name'] != null) {
+              tenDM = cat['Name'];
+            } else if (cat['data'] != null) {
+              tenDM =
+                  (cat['data']['attributes'] ?? cat['data'])['Name'] ?? 'Khác';
+            }
+          }
+
+          // Lấy Tiền và Ghi chú
+          double tien = (attrs['amount'] ?? 0).toDouble();
+          String note = attrs['note'] ?? '';
+
+          // Ghi vào dòng mới
+          sheetObject.appendRow([
+            TextCellValue(ngay),
+            TextCellValue(tenDM),
+            DoubleCellValue(tien),
+            TextCellValue(note),
+          ]);
+        }
+
+        // 4. Lưu file vào bộ nhớ tạm của điện thoại
+        var fileBytes = excel.save();
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/BaoCaoChiTieu_SmartBudget.xlsx');
+        await file.writeAsBytes(fileBytes!);
+
+        if (mounted) Navigator.pop(context); // Tắt loading
+
+        // 5. Bật bảng Share để người dùng tự chọn nơi lưu/gửi
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'Báo cáo chi tiêu của tôi từ Smart AI Budget!');
+      } else {
+        if (mounted) Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("❌ Không thể tải dữ liệu từ server.")),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      debugPrint("Lỗi xuất Excel: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("❌ Lỗi xuất file: $e")));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -274,7 +376,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         color: Colors.grey,
       ),
       onTap: () {
-        // KIỂM TRA: NẾU BẤM VÀO "QUẢN LÝ DANH MỤC" THÌ CHUYỂN TRANG
+        // KIỂM TRA: NẾU BẤM VÀO "QUẢN LÝ DANH MỤC"
         if (title == "Quản lý Danh mục") {
           Navigator.push(
             context,
@@ -282,6 +384,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               builder: (context) => const CategoryManagementScreen(),
             ),
           );
+        }
+        // KIỂM TRA: NẾU BẤM VÀO NÚT XUẤT EXCEL THÌ CHẠY HÀM (MỚI THÊM)
+        else if (title == "Xuất báo cáo Excel") {
+          _xuatBaoCaoExcel(); // Kích hoạt nhà máy!
         }
       },
     );
