@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import '../main.dart'; // Nạp file main để lấy cái công tắc isDarkGlobal
 import 'category_management_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Nhớ import thư viện này ở đầu file nhé
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -112,6 +113,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("❌ Lỗi xuất file: $e")));
+    }
+  }
+
+  // --- HÀM HỦY DIỆT: RESET ỨNG DỤNG ---
+  Future<void> _xoaToanBoDuLieu() async {
+    // 1. Cảnh báo đỏ
+    bool confirm =
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red),
+                SizedBox(width: 10),
+                Text("CẢNH BÁO ĐỎ", style: TextStyle(color: Colors.red)),
+              ],
+            ),
+            content: const Text(
+              "Hành động này sẽ xóa sạch toàn bộ lịch sử chi tiêu và cài đặt ngân sách. Bạn có chắc chắn muốn reset ứng dụng không?",
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text("Hủy"),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  "Xóa sạch",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirm) return; // Nếu user chọn Hủy thì quay xe
+
+    // 2. Hiện vòng xoay Loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(color: Colors.redAccent),
+      ),
+    );
+
+    try {
+      // 3. Quét sạch Két sắt nội bộ (Xóa hạn mức ngân sách)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      // 4. Lên Strapi lấy danh sách tất cả Giao dịch (Transactions)
+      final url = Uri.parse('http://10.185.83.167:1337/api/transactions');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+
+        // 5. Bắn bỏ từng giao dịch một (Vì Strapi mặc định không cho xóa Bulk Delete 1 lần)
+        for (var item in data) {
+          var id = item['documentId'] ?? item['id'];
+          await http.delete(
+            Uri.parse('http://10.185.83.167:1337/api/transactions/$id'),
+          );
+        }
+      }
+
+      // Tắt Loading và báo tin mừng
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("✨ Đã Reset ứng dụng như mới!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      debugPrint("Lỗi reset dữ liệu: $e");
     }
   }
 
@@ -388,6 +480,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // KIỂM TRA: NẾU BẤM VÀO NÚT XUẤT EXCEL THÌ CHẠY HÀM (MỚI THÊM)
         else if (title == "Xuất báo cáo Excel") {
           _xuatBaoCaoExcel(); // Kích hoạt nhà máy!
+        }
+        // KIỂM TRA: NẾU BẤM VÀO NÚT XÓA THÌ GỌI HÀM HỦY DIỆT
+        else if (title == "Xóa toàn bộ dữ liệu") {
+          _xoaToanBoDuLieu();
         }
       },
     );
