@@ -15,16 +15,44 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   List<dynamic> _danhSachDanhMuc = [];
 
   // Các Icon và Màu sắc mẫu để người dùng chọn khi tạo danh mục mới
+  // --- KHO ICON SIÊU TO KHỔNG LỒ ĐÃ ĐƯỢC MỞ RỘNG ---
   final List<IconData> _danhSachIcon = [
+    // Ăn uống
     Icons.fastfood_rounded,
     Icons.local_cafe_rounded,
-    Icons.sports_esports_rounded,
-    Icons.shopping_bag_rounded,
-    Icons.fitness_center_rounded,
-    Icons.menu_book_rounded,
+    Icons.restaurant_rounded,
+    Icons.local_bar_rounded,
+    Icons.cake_rounded,
+    // Di chuyển
+    Icons.directions_car_rounded,
+    Icons.two_wheeler_rounded,
     Icons.local_gas_station_rounded,
+    Icons.flight_takeoff_rounded,
+    Icons.train_rounded,
+    // Mua sắm
+    Icons.shopping_bag_rounded,
+    Icons.shopping_cart_rounded,
+    Icons.checkroom_rounded,
+    Icons.diamond_rounded,
+    Icons.smart_toy_rounded,
+    // Giải trí & Thể thao
+    Icons.sports_esports_rounded,
+    Icons.fitness_center_rounded,
+    Icons.movie_creation_rounded,
+    Icons.music_note_rounded,
+    Icons.palette_rounded,
+    // Hóa đơn & Nhà cửa
     Icons.home_rounded,
+    Icons.water_drop_rounded,
+    Icons.bolt_rounded,
+    Icons.wifi_rounded,
+    Icons.phone_android_rounded,
+    // Sức khỏe & Học tập
     Icons.medical_services_rounded,
+    Icons.menu_book_rounded,
+    Icons.school_rounded,
+    Icons.monitor_heart_rounded,
+    Icons.psychology_rounded,
   ];
 
   final List<Color> _danhSachMau = [
@@ -214,9 +242,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                             body: json.encode({
                               "data": {
                                 "Name": tenDM,
-                                // Nếu Strapi của ông có tạo sẵn field Icon và Color thì mở comment 2 dòng dưới ra nhé:
-                                // "Icon": iconDuocChon.codePoint.toString(),
-                                // "Color": mauDuocChon.value.toRadixString(16),
+                                "Icon": iconDuocChon.codePoint.toString(),
+                                "Color": mauDuocChon.value.toRadixString(16),
                               },
                             }),
                           );
@@ -336,6 +363,41 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
                 // 2. ĐỊNH NGHĨA BIẾN `tenDM` Ở ĐÂY ĐỂ BÊN DƯỚI XÀI THOẢI MÁI
                 String tenDM = dm['Name'] ?? 'Chưa có tên';
+                // 1. Dịch Icon
+                // 1. Dịch Icon từ Strapi
+                int? codePoint = int.tryParse(dm['Icon'] ?? '');
+                IconData iconData = codePoint != null
+                    ? IconData(codePoint, fontFamily: 'MaterialIcons')
+                    : Icons.category_rounded;
+
+                // 2. Dịch Màu sắc từ Strapi
+                String colorStr = dm['Color'] ?? '';
+                Color colorData = Colors.blueAccent;
+                if (colorStr.isNotEmpty) {
+                  try {
+                    colorData = Color(int.parse(colorStr, radix: 16));
+                  } catch (e) {}
+                }
+
+                // --- 3. ĐỒNG BỘ LOGIC: TỰ CỨU MẤY DANH MỤC CŨ CHƯA CÓ ICON ---
+                if (codePoint == null || colorStr.isEmpty) {
+                  String tenToLowerCase = tenDM.toLowerCase();
+                  if (tenToLowerCase.contains('ăn')) {
+                    iconData = Icons.fastfood_rounded;
+                    colorData = Colors.orange;
+                  } else if (tenToLowerCase.contains('giải') ||
+                      tenToLowerCase.contains('chơi')) {
+                    iconData = Icons.sports_esports_rounded;
+                    colorData = Colors.purple;
+                  } else if (tenToLowerCase.contains('học')) {
+                    iconData = Icons.school_rounded;
+                    colorData = Colors.blue;
+                  } else if (tenToLowerCase.contains('nhà') ||
+                      tenToLowerCase.contains('trọ')) {
+                    iconData = Icons.home_rounded;
+                    colorData = Colors.teal;
+                  }
+                }
 
                 return Card(
                   elevation: 2,
@@ -347,34 +409,31 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                     leading: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.blueAccent.withOpacity(0.1),
+                        color: colorData.withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.category_rounded,
-                        color: Colors.blueAccent,
-                      ),
+                      child: Icon(
+                        iconData,
+                        color: colorData,
+                      ), // Dùng icon và màu đã đồng bộ!
                     ),
-                    // Dùng biến tenDM hiển thị tên
                     title: Text(
                       tenDM,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-
-                    // --- NÚT XÓA ĐÃ LẮP LOGIC ---
                     trailing: IconButton(
                       icon: const Icon(
                         Icons.delete_outline_rounded,
                         color: Colors.redAccent,
                       ),
                       onPressed: () {
-                        // Bật bảng hỏi "Chắc chưa?" cho chuyên nghiệp
+                        // Bật bảng hỏi "Chắc chưa?"
                         showDialog(
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text("Xóa danh mục?"),
                             content: Text(
-                              "Ông có chắc chắn muốn xóa '$tenDM' không?",
+                              "Bạn có chắc chắn muốn xóa '$tenDM' không?",
                             ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(15),
@@ -389,16 +448,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                                   backgroundColor: Colors.redAccent,
                                 ),
                                 onPressed: () {
-                                  Navigator.pop(ctx); // Đóng bảng hỏi
-                                  // Lấy ID chuẩn Strapi (v4 hoặc cũ) để bắn API
+                                  Navigator.pop(ctx);
                                   var idDM =
                                       dm['documentId'] ??
                                       _danhSachDanhMuc[index]['id'];
-                                  _xoaDanhMuc(
-                                    idDM,
-                                    tenDM,
-                                    index,
-                                  ); // Xuất chiêu!
+                                  _xoaDanhMuc(idDM, tenDM, index);
                                 },
                                 child: const Text(
                                   "Xóa luôn",

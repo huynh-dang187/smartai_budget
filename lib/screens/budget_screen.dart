@@ -50,31 +50,49 @@ class _BudgetScreenState extends State<BudgetScreen> {
           final attrs = item['attributes'] ?? item;
           String tenDM = attrs['Name'] ?? 'Khác';
 
-          // Gán Icon tự động dựa theo tên cho nó sinh động
           IconData icon = Icons.category_rounded;
           Color mau = Colors.blueGrey;
-          String tenToLowerCase = tenDM.toLowerCase();
 
-          if (tenToLowerCase.contains('ăn')) {
-            icon = Icons.fastfood_rounded;
-            mau = Colors.orange;
-          } else if (tenToLowerCase.contains('giải') ||
-              tenToLowerCase.contains('chơi')) {
-            icon = Icons.sports_esports_rounded;
-            mau = Colors.purple;
-          } else if (tenToLowerCase.contains('học')) {
-            icon = Icons.school_rounded;
-            mau = Colors.blue;
-          } else if (tenToLowerCase.contains('nhà') ||
-              tenToLowerCase.contains('trọ')) {
-            icon = Icons.home_rounded;
-            mau = Colors.teal;
+          // 1. ƯU TIÊN LẤY TỪ STRAPI VỀ (Cho mấy danh mục ông mới tạo như Wifi)
+          bool hasCustomIcon =
+              attrs['Icon'] != null && attrs['Icon'].toString().isNotEmpty;
+          bool hasCustomColor =
+              attrs['Color'] != null && attrs['Color'].toString().isNotEmpty;
+
+          if (hasCustomIcon) {
+            icon = IconData(
+              int.parse(attrs['Icon'].toString()),
+              fontFamily: 'MaterialIcons',
+            );
+          }
+          if (hasCustomColor) {
+            mau = Color(int.parse(attrs['Color'].toString(), radix: 16));
+          }
+
+          // 2. PHAO CỨU SINH CHO DANH MỤC CŨ (Ăn uống, Giải trí, Học phí...)
+          if (!hasCustomIcon || !hasCustomColor) {
+            String tenToLowerCase = tenDM.toLowerCase();
+            if (tenToLowerCase.contains('ăn')) {
+              if (!hasCustomIcon) icon = Icons.fastfood_rounded;
+              if (!hasCustomColor) mau = Colors.orange;
+            } else if (tenToLowerCase.contains('giải') ||
+                tenToLowerCase.contains('chơi')) {
+              if (!hasCustomIcon) icon = Icons.sports_esports_rounded;
+              if (!hasCustomColor) mau = Colors.purple;
+            } else if (tenToLowerCase.contains('học')) {
+              if (!hasCustomIcon) icon = Icons.school_rounded;
+              if (!hasCustomColor) mau = Colors.blue;
+            } else if (tenToLowerCase.contains('nhà') ||
+                tenToLowerCase.contains('trọ')) {
+              if (!hasCustomIcon) icon = Icons.home_rounded;
+              if (!hasCustomColor) mau = Colors.teal;
+            }
           }
 
           dmTam.add({
             "ten": tenDM,
             "daTieu": 0.0,
-            "hanMuc": 1000000.0, // Mặc định cho mọi danh mục mới là 1 củ
+            "hanMuc": 1000000.0,
             "icon": icon,
             "mauIcon": mau,
           });
