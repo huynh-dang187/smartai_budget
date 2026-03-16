@@ -99,8 +99,9 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
       final data = json.decode(aiReply);
       // Gọi lệnh gửi lên Strapi
       // Gọi lệnh gửi lên Strapi (truyền đủ 3 món: tiền, ghi chú, danh mục)
+      int soTienChuan = int.tryParse(data['amount'].toString()) ?? 0;
       await _luuGiaoDichLenStrapi(
-        data['amount'],
+        soTienChuan, // <--- Đã an toàn tuyệt đối
         data['note'],
         data['category'],
       ); // 5. Hiển thị kết quả bóc tách ra màn hình để test

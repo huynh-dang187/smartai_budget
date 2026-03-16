@@ -263,6 +263,50 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     ); // Đóng showModalBottomSheet
   }
 
+  // --- HÀM GỌI API XÓA DANH MỤC LÊN STRAPI ---
+  Future<void> _xoaDanhMuc(var idDM, String tenDM, int index) async {
+    // 1. Hiển thị cái vòng xoay xoay cho user biết đang xóa
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final url = Uri.parse('http://10.185.83.167:1337/api/categories/$idDM');
+      final response = await http.delete(url);
+
+      if (context.mounted) Navigator.pop(context); // Tắt vòng xoay
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // 2. Cập nhật lại giao diện ngay lập tức
+        setState(() {
+          _danhSachDanhMuc.removeAt(index);
+        });
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("🗑️ Đã xóa danh mục: $tenDM"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      } else {
+        debugPrint("Lỗi Strapi từ chối xóa: ${response.body}");
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("❌ Xóa thất bại! Kiểm tra quyền trên Strapi."),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context);
+      debugPrint("Lỗi mạng khi xóa: $e");
+    }
+  }
+
   // --- HÀM BUILD VẼ GIAO DIỆN CHÍNH (Lúc nãy bị mất tiêu) ---
   @override
   Widget build(BuildContext context) {
@@ -285,9 +329,14 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
               padding: const EdgeInsets.all(16),
               itemCount: _danhSachDanhMuc.length,
               itemBuilder: (context, index) {
+                // 1. Lấy cục data của danh mục hiện tại
                 final dm =
                     _danhSachDanhMuc[index]['attributes'] ??
                     _danhSachDanhMuc[index];
+
+                // 2. ĐỊNH NGHĨA BIẾN `tenDM` Ở ĐÂY ĐỂ BÊN DƯỚI XÀI THOẢI MÁI
+                String tenDM = dm['Name'] ?? 'Chưa có tên';
+
                 return Card(
                   elevation: 2,
                   shape: RoundedRectangleBorder(
@@ -306,17 +355,59 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         color: Colors.blueAccent,
                       ),
                     ),
+                    // Dùng biến tenDM hiển thị tên
                     title: Text(
-                      dm['Name'] ?? 'Chưa có tên',
+                      tenDM,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
+
+                    // --- NÚT XÓA ĐÃ LẮP LOGIC ---
                     trailing: IconButton(
                       icon: const Icon(
                         Icons.delete_outline_rounded,
                         color: Colors.redAccent,
                       ),
                       onPressed: () {
-                        // TODO: Gắn API Xóa danh mục
+                        // Bật bảng hỏi "Chắc chưa?" cho chuyên nghiệp
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text("Xóa danh mục?"),
+                            content: Text(
+                              "Ông có chắc chắn muốn xóa '$tenDM' không?",
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text("Hủy"),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(ctx); // Đóng bảng hỏi
+                                  // Lấy ID chuẩn Strapi (v4 hoặc cũ) để bắn API
+                                  var idDM =
+                                      dm['documentId'] ??
+                                      _danhSachDanhMuc[index]['id'];
+                                  _xoaDanhMuc(
+                                    idDM,
+                                    tenDM,
+                                    index,
+                                  ); // Xuất chiêu!
+                                },
+                                child: const Text(
+                                  "Xóa luôn",
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
                       },
                     ),
                   ),

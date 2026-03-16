@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
 import 'screens/main_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 1. Nhớ import thằng này vào
 
 // --- VŨ KHÍ BÍ MẬT: CÔNG TẮC TỔNG TOÀN CỤC ---
 // Bất cứ màn hình nào cũng có thể gọi cái này để đổi màu app
 final ValueNotifier<bool> isDarkGlobal = ValueNotifier(false);
 
-void main() {
+void main() async {
+  // 3. Lệnh bắt buộc để Flutter chuẩn bị nền tảng trước khi load file
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 4. Đọc file .env và nạp API Key vào bộ nhớ!
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Không tìm thấy file .env! Lỗi: $e");
+  }
+
+  // 5. Sau khi nạp xong mới cho chạy App
   runApp(const SmartBudgetApp());
 }
 
