@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../main.dart'; // Nạp file main để lấy cái công tắc isDarkGlobal
 import 'category_management_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Nhớ import thư viện này ở đầu file nhé
+import 'auth_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -227,79 +228,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- 1. THẺ PROFILE SIÊU VIP ---
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Colors.blueAccent, Colors.lightBlue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            // --- 1.5 NHÓM TÀI KHOẢN  ---
+            const Padding(
+              padding: EdgeInsets.only(left: 8, bottom: 10),
+              child: Text(
+                "TÀI KHOẢN",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
                 ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // Avatar
-                  Container(
-                    padding: const EdgeInsets.all(3), // Viền trắng ngoài Avatar
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: CircleAvatar(
-                      radius: 35,
-                      backgroundImage: NetworkImage(
-                        'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-                      ), // Avatar mặc định ngầu ngầu
-                      backgroundColor: Colors.blue.shade50,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  // Thông tin cá nhân
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Duy (Chiến Thần)",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          "Mobile Developer Intern",
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          "toeic.target.700@gmail.com",
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Nút chỉnh sửa
-                  IconButton(
-                    icon: const Icon(Icons.edit_square, color: Colors.white),
-                    onPressed: () {},
-                  ),
-                ],
               ),
             ),
-
-            const SizedBox(height: 25),
-
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              margin: const EdgeInsets.only(bottom: 20),
+              child: _buildMenuRow(
+                Icons.cloud_sync_rounded,
+                Colors.blue,
+                "Đăng nhập / Đăng ký",
+                "Lưu trữ và đồng bộ dữ liệu lên mây",
+              ),
+            ),
             // --- 2. NHÓM CÀI ĐẶT: GIAO DIỆN ---
             const Padding(
               padding: EdgeInsets.only(left: 8, bottom: 10),
@@ -484,6 +437,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // KIỂM TRA: NẾU BẤM VÀO NÚT XÓA THÌ GỌI HÀM HỦY DIỆT
         else if (title == "Xóa toàn bộ dữ liệu") {
           _xoaToanBoDuLieu();
+        }
+        //Kiểm tra đăng nhập
+        else if (title == "Đăng nhập / Đăng ký") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AuthScreen()),
+          );
         }
       },
     );
