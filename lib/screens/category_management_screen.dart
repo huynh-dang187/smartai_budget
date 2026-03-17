@@ -74,7 +74,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
   // --- GỌI API LẤY DANH MỤC TỪ STRAPI ---
   Future<void> _taiDanhSachTuStrapi() async {
-    final url = Uri.parse('http://10.185.83.167:1337/api/categories');
+    final url = Uri.parse('http://10.57.162.167:1337/api/categories');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -234,7 +234,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         // Gọi API bắn dữ liệu lên Strapi
                         try {
                           final url = Uri.parse(
-                            'http://10.185.83.167:1337/api/categories',
+                            'http://10.57.162.167:1337/api/categories',
                           );
                           final response = await http.post(
                             url,
@@ -290,6 +290,207 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     ); // Đóng showModalBottomSheet
   }
 
+  // --- BẢNG SỬA DANH MỤC (UPDATE) ---
+  void _hienThiBangSuaDanhMuc(
+    String idDM,
+    String tenCu,
+    IconData iconCu,
+    Color mauCu,
+  ) {
+    final TextEditingController tenController = TextEditingController(
+      text: tenCu,
+    );
+    IconData iconDuocChon = iconCu;
+    Color mauDuocChon = mauCu;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+              ),
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                      child: Text(
+                        "Sửa Danh Mục",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 1. Nhập tên danh mục
+                    TextField(
+                      controller: tenController,
+                      decoration: InputDecoration(
+                        labelText: "Tên danh mục",
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 2. Chọn Icon
+                    const Text(
+                      "Chọn Biểu tượng",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 15,
+                      runSpacing: 15,
+                      children: _danhSachIcon.map((icon) {
+                        bool isSelected = icon == iconDuocChon;
+                        return GestureDetector(
+                          onTap: () => setModalState(() => iconDuocChon = icon),
+                          child: CircleAvatar(
+                            backgroundColor: isSelected
+                                ? mauDuocChon.withOpacity(0.2)
+                                : Colors.grey.shade100,
+                            child: Icon(
+                              icon,
+                              color: isSelected ? mauDuocChon : Colors.grey,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 3. Chọn Màu sắc
+                    const Text(
+                      "Chọn Màu sắc",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 12,
+                      children: _danhSachMau.map((mau) {
+                        bool isSelected = mau == mauDuocChon;
+                        return GestureDetector(
+                          onTap: () => setModalState(() => mauDuocChon = mau),
+                          child: Container(
+                            width: 35,
+                            height: 35,
+                            decoration: BoxDecoration(
+                              color: mau,
+                              shape: BoxShape.circle,
+                              border: isSelected
+                                  ? Border.all(color: Colors.black87, width: 3)
+                                  : null,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // 4. NÚT LƯU (GỌI API PUT)
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 55),
+                        backgroundColor: mauDuocChon,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      onPressed: () async {
+                        String tenMoi = tenController.text.trim();
+                        if (tenMoi.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("⚠️ Tên không được để trống!"),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                          return;
+                        }
+
+                        // GỌI API PUT ĐỂ UPDATE
+                        try {
+                          final url = Uri.parse(
+                            'http://10.57.162.167:1337/api/categories/$idDM',
+                          );
+                          final response = await http.put(
+                            url,
+                            headers: {'Content-Type': 'application/json'},
+                            body: json.encode({
+                              "data": {
+                                "Name": tenMoi,
+                                "Icon": iconDuocChon.codePoint.toString(),
+                                "Color": mauDuocChon.value.toRadixString(16),
+                              },
+                            }),
+                          );
+
+                          if (response.statusCode == 200) {
+                            if (context.mounted) {
+                              Navigator.pop(context); // Đóng bảng
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("✨ Đã cập nhật: $tenMoi"),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              // Ép tải lại danh sách
+                              setState(() => _isLoading = true);
+                              _taiDanhSachTuStrapi();
+                            }
+                          } else {
+                            debugPrint("Lỗi từ server: ${response.body}");
+                          }
+                        } catch (e) {
+                          debugPrint("Lỗi mạng: $e");
+                        }
+                      },
+                      child: const Text(
+                        "Cập Nhật",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   // --- HÀM GỌI API XÓA DANH MỤC LÊN STRAPI ---
   Future<void> _xoaDanhMuc(var idDM, String tenDM, int index) async {
     // 1. Hiển thị cái vòng xoay xoay cho user biết đang xóa
@@ -300,7 +501,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
 
     try {
-      final url = Uri.parse('http://10.185.83.167:1337/api/categories/$idDM');
+      final url = Uri.parse('http://10.57.162.167:1337/api/categories/$idDM');
       final response = await http.delete(url);
 
       if (context.mounted) Navigator.pop(context); // Tắt vòng xoay
@@ -421,48 +622,74 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       tenDM,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    trailing: IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
-                        color: Colors.redAccent,
-                      ),
-                      onPressed: () {
-                        // Bật bảng hỏi "Chắc chưa?"
-                        showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text("Xóa danh mục?"),
-                            content: Text(
-                              "Bạn có chắc chắn muốn xóa '$tenDM' không?",
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text("Hủy"),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.redAccent,
-                                ),
-                                onPressed: () {
-                                  Navigator.pop(ctx);
-                                  var idDM =
-                                      dm['documentId'] ??
-                                      _danhSachDanhMuc[index]['id'];
-                                  _xoaDanhMuc(idDM, tenDM, index);
-                                },
-                                child: const Text(
-                                  "Xóa luôn",
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ],
+                    // --- CỤM NÚT SỬA VÀ XÓA ---
+                    trailing: Row(
+                      mainAxisSize:
+                          MainAxisSize.min, // Ép Row nhỏ lại cho vừa chỗ
+                      children: [
+                        // Nút Sửa (MỚI)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.edit_rounded,
+                            color: Colors.blueAccent,
                           ),
-                        );
-                      },
+                          onPressed: () {
+                            var idDM =
+                                dm['documentId'] ??
+                                _danhSachDanhMuc[index]['id'];
+                            // Kích hoạt bảng sửa và nhét data cũ vào
+                            _hienThiBangSuaDanhMuc(
+                              idDM.toString(),
+                              tenDM,
+                              iconData,
+                              colorData,
+                            );
+                          },
+                        ),
+                        // Nút Xóa (CŨ)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                          ),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text("Xóa danh mục?"),
+                                content: Text(
+                                  "Bạn có chắc chắn muốn xóa '$tenDM' không?",
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text("Hủy"),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      var idDM =
+                                          dm['documentId'] ??
+                                          _danhSachDanhMuc[index]['id'];
+                                      _xoaDanhMuc(idDM, tenDM, index);
+                                    },
+                                    child: const Text(
+                                      "Xóa luôn",
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 );

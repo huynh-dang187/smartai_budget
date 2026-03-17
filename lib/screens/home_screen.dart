@@ -43,7 +43,7 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> _taiDanhMucDeLayMauVaIcon() async {
     try {
       final response = await http.get(
-        Uri.parse('http://10.185.83.167:1337/api/categories'),
+        Uri.parse('http://10.57.162.167:1337/api/categories'),
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body)['data'];
@@ -95,7 +95,7 @@ class HomeScreenState extends State<HomeScreen> {
     await _taiDanhMucDeLayMauVaIcon(); // Bắt buộc nạp từ điển trước khi kéo giao dịch!
 
     final url = Uri.parse(
-      'http://10.185.83.167:1337/api/transactions?populate=*', // Nhớ check lại IP mỗi ngày
+      'http://10.57.162.167:1337/api/transactions?populate=*', // Nhớ check lại IP mỗi ngày
     );
     try {
       final response = await http.get(url);
@@ -428,7 +428,7 @@ class HomeScreenState extends State<HomeScreen> {
                       onPressed: () async {
                         Navigator.pop(context); // Đóng bảng
                         final deleteUrl = Uri.parse(
-                          'http://10.185.83.167:1337/api/transactions/$idGiaoDich',
+                          'http://10.57.162.167:1337/api/transactions/$idGiaoDich',
                         );
                         try {
                           await http.delete(deleteUrl);
@@ -587,7 +587,7 @@ class HomeScreenState extends State<HomeScreen> {
                   onPressed: () async {
                     Navigator.pop(context);
                     final putUrl = Uri.parse(
-                      'http://10.185.83.167:1337/api/transactions/$idGiaoDich',
+                      'http://10.57.162.167:1337/api/transactions/$idGiaoDich',
                     );
                     try {
                       final response = await http.put(

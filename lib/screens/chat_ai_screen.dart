@@ -25,7 +25,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   }
 
   Future<void> _taiDanhSachDanhMuc() async {
-    final url = Uri.parse('http://10.185.83.167:1337/api/categories');
+    final url = Uri.parse('http://10.57.162.167:1337/api/categories');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -125,7 +125,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     String note,
     String categoryName,
   ) async {
-    final url = Uri.parse('http://10.185.83.167:1337/api/transactions');
+    final url = Uri.parse('http://10.57.162.167:1337/api/transactions');
 
     // 1. CHỐNG AI LÚ & CHỐNG SAI HOA/THƯỜNG: Cắt khoảng trắng và ép về chữ thường
     String tenChuan = categoryName.trim().toLowerCase();

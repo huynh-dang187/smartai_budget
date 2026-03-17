@@ -38,7 +38,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   // BƯỚC 1: LẤY DANH MỤC (MỚI)
   Future<void> _taiDanhSachDanhMucTuStrapi() async {
-    final url = Uri.parse('http://10.185.83.167:1337/api/categories');
+    final url = Uri.parse('http://10.57.162.167:1337/api/categories');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -124,7 +124,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN (ĐÃ FIX LỖI 0 ĐỒNG)
   Future<void> _dongBoDuLieuTuStrapi() async {
     final url = Uri.parse(
-      'http://10.185.83.167:1337/api/transactions?populate=*',
+      'http://10.57.162.167:1337/api/transactions?populate=*',
     );
     try {
       final response = await http.get(url);

@@ -32,7 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       // 2. Lấy toàn bộ giao dịch từ Strapi
       final url = Uri.parse(
-        'http://10.185.83.167:1337/api/transactions?populate=*',
+        'http://10.57.162.167:1337/api/transactions?populate=*',
       );
       final response = await http.get(url);
 
@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await prefs.clear();
 
       // 4. Lên Strapi lấy danh sách tất cả Giao dịch (Transactions)
-      final url = Uri.parse('http://10.185.83.167:1337/api/transactions');
+      final url = Uri.parse('http://10.57.162.167:1337/api/transactions');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -186,7 +186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         for (var item in data) {
           var id = item['documentId'] ?? item['id'];
           await http.delete(
-            Uri.parse('http://10.185.83.167:1337/api/transactions/$id'),
+            Uri.parse('http://10.57.162.167:1337/api/transactions/$id'),
           );
         }
       }
