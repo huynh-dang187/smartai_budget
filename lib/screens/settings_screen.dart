@@ -229,6 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- 1.5 NHÓM TÀI KHOẢN  ---
+            // --- 1.5 NHÓM TÀI KHOẢN ---
             const Padding(
               padding: EdgeInsets.only(left: 8, bottom: 10),
               child: Text(
@@ -240,18 +241,94 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              margin: const EdgeInsets.only(bottom: 20),
-              child: _buildMenuRow(
-                Icons.cloud_sync_rounded,
-                Colors.blue,
-                "Đăng nhập / Đăng ký",
-                "Lưu trữ và đồng bộ dữ liệu lên mây",
-              ),
+
+            // Dùng cảm biến để thay đổi giao diện động!
+            ValueListenableBuilder<String?>(
+              valueListenable: userTokenGlobal,
+              builder: (context, token, child) {
+                // NẾU CHƯA CÓ TOKEN -> HIỆN NÚT ĐĂNG NHẬP
+                if (token == null) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 20),
+                    child: _buildMenuRow(
+                      Icons.cloud_sync_rounded,
+                      Colors.blue,
+                      "Đăng nhập / Đăng ký",
+                      "Lưu trữ và đồng bộ dữ liệu lên mây",
+                    ),
+                  );
+                }
+                // NẾU ĐÃ CÓ TOKEN -> HIỆN PROFILE VÀ NÚT ĐĂNG XUẤT
+                else {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    margin: const EdgeInsets.only(bottom: 20),
+                    child: Column(
+                      children: [
+                        // Hiện tên User lấy từ cảm biến
+                        ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: Colors.blueAccent,
+                            child: Icon(Icons.person, color: Colors.white),
+                          ),
+                          title: Text(
+                            userNameGlobal.value ?? "Người dùng",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: const Text(
+                            "Đã đồng bộ dữ liệu",
+                            style: TextStyle(color: Colors.green, fontSize: 12),
+                          ),
+                        ),
+                        const Divider(height: 1, indent: 60),
+                        // NÚT ĐĂNG XUẤT
+                        ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.logout_rounded,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
+                          ),
+                          title: const Text(
+                            "Đăng xuất",
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onTap: () async {
+                            // HÀNH ĐỘNG ĐĂNG XUẤT: Xóa két sắt, tắt cảm biến
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.remove('jwt_token');
+                            await prefs.remove('username');
+                            userTokenGlobal.value = null;
+                            userNameGlobal.value = null;
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Đã đăng xuất an toàn!"),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              },
             ),
             // --- 2. NHÓM CÀI ĐẶT: GIAO DIỆN ---
             const Padding(

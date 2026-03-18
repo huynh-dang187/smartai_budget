@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart'; // Format tiền và ngày tháng
 import 'package:google_generative_ai/google_generative_ai.dart'; // Não AI
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Lấy key bí mật
+import '../main.dart'; // Nạp cái này để lấy biến userTokenGlobal
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -90,21 +91,38 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- BƯỚC 2: KÉO GIAO DỊCH VỀ ---
+  // --- BƯỚC 2: KÉO GIAO DỊCH VỀ (ĐÃ LẮP VÉ VIP) ---
   Future<void> layDuLieuTuStrapi() async {
-    await _taiDanhMucDeLayMauVaIcon(); // Bắt buộc nạp từ điển trước khi kéo giao dịch!
+    await _taiDanhMucDeLayMauVaIcon();
 
     final url = Uri.parse(
-      'http://10.57.162.167:1337/api/transactions?populate=*', // Nhớ check lại IP mỗi ngày
+      'http://10.57.162.167:1337/api/transactions?populate=*',
     );
+
+    // 1. Móc Token từ túi ra
+    String? token = userTokenGlobal.value;
+
     try {
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        // 2. DÁN VÉ VIP LÊN TRÁN KHI QUA CỬA
+        headers: token != null
+            ? {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              }
+            : null, // Nếu chưa đăng nhập thì đi tay không (Public)
+      );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
           danhSachGiaoDich = data['data'];
           dangTaiDuLieu = false;
         });
+      } else {
+        debugPrint("Lỗi từ server: ${response.body}");
+        setState(() => dangTaiDuLieu = false);
       }
     } catch (e) {
       debugPrint("Lỗi mạng: $e");
