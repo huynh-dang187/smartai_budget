@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'dart:convert'; // Để xử lý cục JSON
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../main.dart';
 
 class ChatAIScreen extends StatefulWidget {
   const ChatAIScreen({super.key});
@@ -15,13 +16,12 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   final TextEditingController _controller = TextEditingController();
   String _ketQua =
       "Hãy gõ chi tiêu của bạn vào đây.\nVí dụ: 'Trưa nay ăn phở hết 45k'";
-  // Khai báo Từ điển: Chìa khóa là Tên danh mục (String), Giá trị là ID (int)
   Map<String, dynamic> _tuDienDanhMuc = {};
 
   @override
   void initState() {
     super.initState();
-    _taiDanhSachDanhMuc(); // Vừa mở Chat là đi lấy danh mục liền
+    _taiDanhSachDanhMuc();
   }
 
   Future<void> _taiDanhSachDanhMuc() async {
@@ -34,10 +34,6 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
 
         setState(() {
           for (var item in danhSach) {
-            // --- THÊM DÒNG NÀY ĐỂ SOI DATA GỐC ---
-            debugPrint("🔍 SOI RAW DATA: $item");
-            // -------------------------------------
-
             String tenDM = item['Name']?.toString() ?? 'Khác';
             var idDM = item['documentId'] ?? item['id'];
 
@@ -61,14 +57,10 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
       _ketQua = "Đang nhờ AI phân tích câu:\n\n'$text'...";
     });
 
-    _controller.clear(); // Xóa khung nhập
-    // Lấy tất cả tên danh mục ghép thành 1 chuỗi: "Ăn uống, Mua sắm, Tiền trọ..."
+    _controller.clear();
     String cacDanhMucHienCo = _tuDienDanhMuc.keys.join(", ");
-
-    // Nếu chưa có danh mục nào thì cho mặc định
     if (cacDanhMucHienCo.isEmpty) cacDanhMucHienCo = "Khác";
 
-    // 1. Tạo câu lệnh Prompt (CHỈ TẠO 1 LẦN Ở ĐÂY THÔI)
     final prompt =
         '''
       Bạn là một trợ lý ảo quản lý chi tiêu. Người dùng vừa nhập câu sau: "$text".
@@ -85,26 +77,18 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
       final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
       final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
 
-      // 3. Gửi cho AI và chờ kết quả
       final response = await model.generateContent([Content.text(prompt)]);
-      String aiReply =
-          response.text ?? "{}"; // Đổi final thành String để dễ chỉnh sửa
+      String aiReply = response.text ?? "{}";
 
-      // --- BÙA CHỐNG LÚ CHO AI ---
-      // Lột sạch mấy cái râu ria (```json và ```) nếu AI lỡ chèn vào
       aiReply = aiReply.replaceAll('```json', '').replaceAll('```', '').trim();
-      // ---------------------------
 
-      // 4. Dịch cục text của AI thành dạng Map (JSON) trong Flutter
       final data = json.decode(aiReply);
-      // Gọi lệnh gửi lên Strapi
-      // Gọi lệnh gửi lên Strapi (truyền đủ 3 món: tiền, ghi chú, danh mục)
+
       int soTienChuan = int.tryParse(data['amount'].toString()) ?? 0;
-      await _luuGiaoDichLenStrapi(
-        soTienChuan, // <--- Đã an toàn tuyệt đối
-        data['note'],
-        data['category'],
-      ); // 5. Hiển thị kết quả bóc tách ra màn hình để test
+
+      // Gọi lệnh gửi lên Strapi
+      await _luuGiaoDichLenStrapi(soTienChuan, data['note'], data['category']);
+
       setState(() {
         _ketQua =
             "🎉 AI đã bóc tách thành công!\n\n"
@@ -120,6 +104,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     }
   }
 
+  // --- HÀM GỬI LÊN STRAPI ĐÃ ĐƯỢC CHUẨN HÓA LẠI ---
   Future<void> _luuGiaoDichLenStrapi(
     int amount,
     String note,
@@ -127,39 +112,40 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   ) async {
     final url = Uri.parse('http://10.57.162.167:1337/api/transactions');
 
-    // 1. CHỐNG AI LÚ & CHỐNG SAI HOA/THƯỜNG: Cắt khoảng trắng và ép về chữ thường
     String tenChuan = categoryName.trim().toLowerCase();
-
-    // 2. TRA TỪ ĐIỂN
     dynamic categoryId = _tuDienDanhMuc[tenChuan];
 
-    // 3. PHAO CỨU SINH: Nếu AI trả về từ tào lao không có trong từ điển
-    // thì mình bắt nó lấy cái Danh mục ĐẦU TIÊN trong từ điển thay vì để null
     if (categoryId == null && _tuDienDanhMuc.isNotEmpty) {
       categoryId = _tuDienDanhMuc.values.first;
-      debugPrint(
-        "⚠️ Cảnh báo: AI trả về '$tenChuan' không có trong từ điển. Đã lấy ID mặc định!",
-      );
+      debugPrint("⚠️ Cảnh báo: Lấy ID mặc định do AI trả về từ lạ!");
     }
 
+    // 1. Móc thẻ VIP và ID từ két sắt ra
+    String? token = userTokenGlobal.value;
+    int? myId = userIdGlobal.value;
+
     debugPrint(
-      "🚀 ĐANG GỬI LÊN STRAPI - Món: $note | Tiền: $amount | ID Danh mục: $categoryId",
+      "🚀 ĐANG GỬI LÊN STRAPI - Món: $note | Tiền: $amount | UserID: $myId",
     );
 
-    final goiHang = json.encode({
-      "data": {
-        "amount": amount,
-        "note": note,
-        "date": DateTime.now().toIso8601String(),
-        "category": categoryId, // Bắn ID xịn này lên!
-      },
-    });
-
     try {
+      // 2. Gọi API POST với Headers và Body đã được bảo vệ
       final response = await http.post(
         url,
-        headers: {"Content-Type": "application/json"},
-        body: goiHang,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          "data": {
+            "amount": amount,
+            "note": note,
+            "date": DateTime.now().toUtc().toIso8601String(),
+            "category": [categoryId.toString()],
+            if (myId != null)
+              "user": [myId.toString()], // BỌC [ ] VÀ .toString()
+          },
+        }),
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -189,13 +175,12 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.teal,
-        foregroundColor: Colors.white, // Chữ màu trắng cho nổi
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Khu vực hiển thị tin nhắn / Kết quả của AI
             Expanded(
               child: Center(
                 child: Padding(
@@ -212,8 +197,6 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
                 ),
               ),
             ),
-
-            // Khu vực ô nhập text và nút Gửi
             Row(
               children: [
                 Expanded(

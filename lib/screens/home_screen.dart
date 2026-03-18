@@ -95,11 +95,15 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> layDuLieuTuStrapi() async {
     await _taiDanhMucDeLayMauVaIcon();
 
+    // Lấy ID của mình ra
+    int? myId = userIdGlobal.value;
+
+    // THẦN CHÚ LỌC DỮ LIỆU: Chỉ lấy giao dịch có user id = myId
+    // Dùng \ trước dấu $ để Flutter không báo lỗi nội suy chuỗi nhé
     final url = Uri.parse(
-      'http://10.57.162.167:1337/api/transactions?populate=*',
+      'http://10.57.162.167:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
     );
 
-    // 1. Móc Token từ túi ra
     String? token = userTokenGlobal.value;
 
     try {

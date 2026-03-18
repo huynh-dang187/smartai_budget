@@ -6,9 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart'; // MỚI THÊM
 // --- VŨ KHÍ BÍ MẬT: CÔNG TẮC TỔNG TOÀN CỤC ---
 // Bất cứ màn hình nào cũng có thể gọi cái này để đổi màu app
 final ValueNotifier<bool> isDarkGlobal = ValueNotifier(false);
+
 // --- CẢM BIẾN ĐĂNG NHẬP
 final ValueNotifier<String?> userTokenGlobal = ValueNotifier(null);
 final ValueNotifier<String?> userNameGlobal = ValueNotifier(null);
+final ValueNotifier<int?> userIdGlobal = ValueNotifier(
+  null,
+); // ĐẶT Ở NGOÀI NÀY NÈ!
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -19,10 +23,13 @@ void main() async {
   }
 
   // --- TỰ ĐỘNG MÓC KÉT SẮT KHI MỞ APP (MỚI THÊM) ---
+
   final prefs = await SharedPreferences.getInstance();
   userTokenGlobal.value = prefs.getString('jwt_token');
   userNameGlobal.value = prefs.getString('username');
-
+  userIdGlobal.value = prefs.getInt(
+    'user_id',
+  ); // Ở trong này chỉ lấy giá trị thôi
   runApp(const SmartBudgetApp());
 }
 

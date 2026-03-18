@@ -314,9 +314,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             final prefs = await SharedPreferences.getInstance();
                             await prefs.remove('jwt_token');
                             await prefs.remove('username');
+                            await prefs.remove('user_id');
                             userTokenGlobal.value = null;
                             userNameGlobal.value = null;
-
+                            userIdGlobal.value = null; // MỚI THÊM
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text("Đã đăng xuất an toàn!"),

@@ -86,10 +86,12 @@ class _AuthScreenState extends State<AuthScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', jwtToken);
         await prefs.setString('username', user['username']);
+        await prefs.setInt('user_id', user['id']); // MỚI THÊM: Lưu ID
 
         // Bật cảm biến để toàn app biết sếp đã login!
         userTokenGlobal.value = jwtToken;
         userNameGlobal.value = user['username'];
+        userIdGlobal.value = user['id']; // MỚI THÊM: Bật cảm biến ID
         if (mounted) {
           Navigator.pop(context); // Đóng bảng Auth lại, cho vào app
           ScaffoldMessenger.of(context).showSnackBar(
