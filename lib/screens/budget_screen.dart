@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import '../main.dart';
 
 class BudgetScreen extends StatefulWidget {
   const BudgetScreen({super.key});
@@ -140,8 +141,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN
   Future<void> _dongBoDuLieuTuStrapi() async {
+    int? myId = userIdGlobal.value;
     final url = Uri.parse(
-      'http://10.57.162.167:1337/api/transactions?populate=*',
+      'http://10.57.162.167:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
     );
     try {
       // 🔑 LẤY TOKEN

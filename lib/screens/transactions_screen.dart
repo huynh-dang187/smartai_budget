@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../main.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -24,8 +25,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   }
 
   Future<void> _layDuLieuTuStrapi() async {
+    int? myId = userIdGlobal.value;
     final url = Uri.parse(
-      'http://10.57.162.167:1337/api/transactions?populate=*',
+      'http://10.57.162.167:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
     );
     try {
       // 1. Lấy Token từ bộ nhớ ra (Ông nhớ check lại tên key 'token' xem đúng với tên lúc ông lưu ở màn hình Login không nhé)
