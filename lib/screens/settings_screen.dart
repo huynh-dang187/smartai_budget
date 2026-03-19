@@ -119,7 +119,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // --- HÀM HỦY DIỆT: RESET ỨNG DỤNG ---
   Future<void> _xoaToanBoDuLieu() async {
-    // 1. Cảnh báo đỏ
     bool confirm =
         await showDialog(
           context: context,
@@ -160,9 +159,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ) ??
         false;
 
-    if (!confirm) return; // Nếu user chọn Hủy thì quay xe
+    if (!confirm) return;
 
-    // 2. Hiện vòng xoay Loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -172,32 +170,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     try {
-      // 3. Quét sạch Két sắt nội bộ (Xóa hạn mức ngân sách)
       final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
 
-      // 4. Lên Strapi lấy danh sách tất cả Giao dịch (Transactions)
+      // 1. CHỈ XÓA CÀI ĐẶT NGÂN SÁCH (Lọc các key bắt đầu bằng 'hanMuc_')
+      // Tuyệt đối không dùng prefs.clear() nữa vì nó sẽ xóa luôn tài khoản đăng nhập!
+      final keys = prefs.getKeys();
+      for (String key in keys) {
+        if (key.startsWith('hanMuc_')) {
+          await prefs.remove(key);
+        }
+      }
+
+      // 2. LẤY LẠI VÉ VIP TỪ BIẾN TOÀN CỤC HOẶC BỘ NHỚ
+      String? savedToken =
+          userTokenGlobal.value ??
+          prefs.getString('jwt') ??
+          prefs.getString('token');
+
+      final headers = {
+        'Content-Type': 'application/json',
+        if (savedToken != null) 'Authorization': 'Bearer $savedToken',
+      };
+
+      // 3. LÊN STRAPI LẤY DANH SÁCH VÀ XÓA TỪNG MÓN
       final url = Uri.parse('http://10.57.162.167:1337/api/transactions');
-      final response = await http.get(url);
+      final response = await http.get(url, headers: headers); // Đã thêm vé VIP
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body)['data'];
 
-        // 5. Bắn bỏ từng giao dịch một (Vì Strapi mặc định không cho xóa Bulk Delete 1 lần)
         for (var item in data) {
           var id = item['documentId'] ?? item['id'];
+          // GỌI LỆNH TRẢM QUYẾT TỪNG ITEM MỘT (Phải có vé VIP)
           await http.delete(
             Uri.parse('http://10.57.162.167:1337/api/transactions/$id'),
+            headers: headers,
           );
         }
       }
 
-      // Tắt Loading và báo tin mừng
+      // 4. BẤM CHUÔNG BÁO ĐỘNG ĐỂ 3 MÀN HÌNH CÙNG F5
+      refreshDataGlobal.value = true;
+
+      // 5. BÁO TIN MỪNG
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // Đóng vòng xoay
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("✨ Đã Reset ứng dụng như mới!"),
+            content: Text("✨ Đã xóa sạch dữ liệu trên toàn Server!"),
             backgroundColor: Colors.green,
           ),
         );

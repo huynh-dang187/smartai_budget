@@ -3,6 +3,8 @@ import 'screens/main_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // 1. Nhớ import thằng này vào
 import 'package:shared_preferences/shared_preferences.dart'; // MỚI THÊM
 
+// Thêm chuông báo động để các màn hình gọi nhau tải lại data
+final ValueNotifier<bool> refreshDataGlobal = ValueNotifier(false);
 // --- VŨ KHÍ BÍ MẬT: CÔNG TẮC TỔNG TOÀN CỤC ---
 // Bất cứ màn hình nào cũng có thể gọi cái này để đổi màu app
 final ValueNotifier<bool> isDarkGlobal = ValueNotifier(false);

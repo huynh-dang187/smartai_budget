@@ -38,6 +38,16 @@ class HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     layDuLieuTuStrapi();
+
+    // DỌNG NGHE LÉN CHUÔNG BÁO ĐỘNG TỪ FILE MAIN
+    refreshDataGlobal.addListener(() {
+      if (refreshDataGlobal.value == true && mounted) {
+        // Nếu chuông kêu -> Tự động gọi lại hàm lấy dữ liệu để vẽ lại biểu đồ
+        layDuLieuTuStrapi();
+        // Tắt chuông đi
+        refreshDataGlobal.value = false;
+      }
+    });
   }
 
   // --- BƯỚC 1: LẤY BỘ NHẬN DIỆN THƯƠNG HIỆU TỪ STRAPI ---
@@ -120,17 +130,19 @@ class HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        setState(() {
-          danhSachGiaoDich = data['data'];
-          dangTaiDuLieu = false;
-        });
+        if (mounted) {
+          setState(() {
+            danhSachGiaoDich = data['data'];
+            dangTaiDuLieu = false;
+          });
+        }
       } else {
         debugPrint("Lỗi từ server: ${response.body}");
-        setState(() => dangTaiDuLieu = false);
+        if (mounted) setState(() => dangTaiDuLieu = false);
       }
     } catch (e) {
       debugPrint("Lỗi mạng: $e");
-      setState(() => dangTaiDuLieu = false);
+      if (mounted) setState(() => dangTaiDuLieu = false);
     }
   }
 

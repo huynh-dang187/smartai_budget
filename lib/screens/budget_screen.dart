@@ -40,7 +40,18 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Future<void> _taiDanhSachDanhMucTuStrapi() async {
     final url = Uri.parse('http://10.57.162.167:1337/api/categories');
     try {
-      final response = await http.get(url);
+      // 🔑 LẤY TOKEN
+      String? token = _prefs.getString('jwt') ?? _prefs.getString('token');
+
+      // 🔑 GẮN TOKEN VÀO HEADER
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List categories = data['data'];
@@ -53,7 +64,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
           IconData icon = Icons.category_rounded;
           Color mau = Colors.blueGrey;
 
-          // 1. ƯU TIÊN LẤY TỪ STRAPI VỀ (Cho mấy danh mục ông mới tạo như Wifi)
+          // Ưu tiên lấy icon/màu từ Strapi
           bool hasCustomIcon =
               attrs['Icon'] != null && attrs['Icon'].toString().isNotEmpty;
           bool hasCustomColor =
@@ -69,7 +80,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
             mau = Color(int.parse(attrs['Color'].toString(), radix: 16));
           }
 
-          // 2. PHAO CỨU SINH CHO DANH MỤC CŨ (Ăn uống, Giải trí, Học phí...)
+          // Fallback cho danh mục cũ
           if (!hasCustomIcon || !hasCustomColor) {
             String tenToLowerCase = tenDM.toLowerCase();
             if (tenToLowerCase.contains('ăn')) {
@@ -101,9 +112,15 @@ class _BudgetScreenState extends State<BudgetScreen> {
         setState(() {
           danhSachNganSach = dmTam;
         });
+      } else {
+        // 🚨 NẾU API TỪ CHỐI (VÍ DỤ LỖI 403), TẮT VÒNG XOAY NGAY
+        debugPrint("Lỗi tải danh mục API: ${response.statusCode}");
+        setState(() => _dangTai = false);
       }
     } catch (e) {
+      // 🚨 BẮT LỖI MẠNG ĐỂ KHÔNG BỊ XOAY MÃI
       debugPrint("Lỗi tải danh mục: $e");
+      setState(() => _dangTai = false);
     }
   }
 
@@ -121,13 +138,25 @@ class _BudgetScreenState extends State<BudgetScreen> {
     });
   }
 
-  // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN (ĐÃ FIX LỖI 0 ĐỒNG)
+  // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN
   Future<void> _dongBoDuLieuTuStrapi() async {
     final url = Uri.parse(
       'http://10.57.162.167:1337/api/transactions?populate=*',
     );
     try {
-      final response = await http.get(url);
+      // 🔑 LẤY TOKEN
+      String? token =
+          _prefs.getString('jwt_token') ?? _prefs.getString('token');
+
+      // 🔑 GẮN TOKEN VÀO HEADER
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List giaoDich = data['data'];
@@ -146,22 +175,17 @@ class _BudgetScreenState extends State<BudgetScreen> {
             double tien = (attrs['amount'] ?? 0).toDouble();
             tongTienThangNay += tien;
 
-            // --- ĐOẠN FIX LỖI Ở ĐÂY: Dùng lại logic đọc JSON chuẩn xác của ông ---
             String tenDM = 'Khác';
             if (attrs['category'] != null) {
               var cat = attrs['category'];
-              // Thử đọc kiểu cũ của ông (Không có data/attributes)
               if (cat['Name'] != null) {
                 tenDM = cat['Name'];
-              }
-              // Thử đọc kiểu Strapi v4 gốc (nếu có)
-              else if (cat['data'] != null) {
+              } else if (cat['data'] != null) {
                 tenDM =
                     (cat['data']['attributes'] ?? cat['data'])['Name'] ??
                     'Khác';
               }
             }
-            // ----------------------------------------------------------------------
 
             tienTheoDanhMuc[tenDM] = (tienTheoDanhMuc[tenDM] ?? 0) + tien;
           }
@@ -169,20 +193,24 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
         setState(() {
           tongDaTieu = tongTienThangNay;
-          // Áp tiền đã tiêu vào đúng danh mục động
           for (var nganSach in danhSachNganSach) {
             nganSach['daTieu'] = tienTheoDanhMuc[nganSach['ten']] ?? 0.0;
           }
-          _dangTai = false;
+          _dangTai = false; // Tắt vòng xoay khi chạy xong
         });
+      } else {
+        // 🚨 NẾU API TỪ CHỐI, TẮT VÒNG XOAY NGAY
+        debugPrint("Lỗi đồng bộ giao dịch API: ${response.statusCode}");
+        setState(() => _dangTai = false);
       }
     } catch (e) {
+      // 🚨 BẮT LỖI MẠNG ĐỂ KHÔNG BỊ XOAY MÃI
       debugPrint("Lỗi đồng bộ giao dịch: $e");
       setState(() => _dangTai = false);
     }
   }
 
-  // --- BẢNG TÙY CHỈNH HẠN MỨC (TỰ ĐỘNG THÍCH ỨNG VỚI DANH MỤC MỚI) ---
+  // --- BẢNG TÙY CHỈNH HẠN MỨC ---
   void _hienThiBangSuaHanMuc() {
     Map<String, TextEditingController> controllers = {};
     for (var ns in danhSachNganSach) {
@@ -317,10 +345,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
     if (phanTram.isNaN || phanTram.isInfinite) phanTram = 0.0;
 
     Color mauThanh = Colors.green.shade400;
-    if (phanTram >= 0.85)
+    if (phanTram >= 0.85) {
       mauThanh = Colors.redAccent;
-    else if (phanTram >= 0.5)
+    } else if (phanTram >= 0.5) {
       mauThanh = Colors.orange.shade400;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

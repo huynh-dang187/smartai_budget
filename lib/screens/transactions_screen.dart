@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TransactionsScreen extends StatefulWidget {
   const TransactionsScreen({super.key});
@@ -27,11 +28,24 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       'http://10.57.162.167:1337/api/transactions?populate=*',
     );
     try {
-      final response = await http.get(url);
+      // 1. Lấy Token từ bộ nhớ ra (Ông nhớ check lại tên key 'token' xem đúng với tên lúc ông lưu ở màn hình Login không nhé)
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString(
+        'jwt_token',
+      ); // Có thể là 'jwt' hoặc 'jwt_token'
+
+      // 2. Gắn Token vào Header
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
-          // Sắp xếp dữ liệu mới nhất lên đầu
           _toanBoGiaoDich = data['data']
             ..sort((a, b) {
               DateTime dateA = DateTime.parse(
@@ -40,11 +54,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               DateTime dateB = DateTime.parse(
                 b['date'] ?? DateTime.now().toIso8601String(),
               );
-              return dateB.compareTo(dateA); // Giảm dần
+              return dateB.compareTo(dateA);
             });
           _giaoDichHienThi = _toanBoGiaoDich;
-          _dangTai = false;
+          _dangTai = false; // Tắt vòng xoay
         });
+      } else {
+        // 3. THÊM ELSE ĐỂ BẮT LỖI SILENT
+        debugPrint(
+          "Lỗi Strapi từ chối: ${response.statusCode} - ${response.body}",
+        );
+        setState(() => _dangTai = false); // Bị lỗi cũng phải tắt vòng xoay
       }
     } catch (e) {
       debugPrint("Lỗi mạng: $e");
