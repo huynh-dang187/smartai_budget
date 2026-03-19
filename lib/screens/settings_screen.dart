@@ -31,11 +31,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     try {
-      // 2. Lấy toàn bộ giao dịch từ Strapi
+      // 2. CHUẨN BỊ THẺ CĂN CƯỚC (USER ID) VÀ VÉ VIP (TOKEN)
+      int? myId = userIdGlobal.value;
+
+      // Nếu myId null thì không cho xuất báo cáo (Tránh lỗi)
+      if (myId == null) {
+        if (mounted) Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("❌ Lỗi: Không xác định được tài khoản!"),
+          ),
+        );
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      String? token =
+          userTokenGlobal.value ??
+          prefs.getString('jwt') ??
+          prefs.getString('token');
+
+      // 3. GẮN THẦN CHÚ LỌC USER VÀO URL
       final url = Uri.parse(
-        'http://10.57.162.167:1337/api/transactions?populate=*',
+        'http://10.57.162.167:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
       );
-      final response = await http.get(url);
+
+      // 4. GẮN VÉ VIP VÀO REQUEST
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null)
+            'Authorization': 'Bearer $token', // 🔑 Chìa khóa đây!
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -104,8 +133,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ], text: 'Báo cáo chi tiêu của tôi từ Smart AI Budget!');
       } else {
         if (mounted) Navigator.pop(context);
+        debugPrint(
+          "Lỗi Strapi trả về khi xuất Excel: ${response.statusCode} - ${response.body}",
+        );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("❌ Không thể tải dữ liệu từ server.")),
+          const SnackBar(
+            content: Text(
+              "❌ Không thể tải dữ liệu từ server. Hãy kiểm tra lại kết nối!",
+            ),
+          ),
         );
       }
     } catch (e) {
