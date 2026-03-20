@@ -1036,14 +1036,14 @@ class HomeScreenState extends State<HomeScreen> {
                 ),
                 // --- KHU VỰC 2: BIỂU ĐỒ TRÒN ---
                 SizedBox(
-                  height: 250,
+                  height: 220,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       PieChart(
                         PieChartData(
                           sections: _taoDuLieuBieuDo(),
-                          centerSpaceRadius: 40,
+                          centerSpaceRadius: 35,
                           sectionsSpace: 2,
                         ),
                         swapAnimationDuration: const Duration(
