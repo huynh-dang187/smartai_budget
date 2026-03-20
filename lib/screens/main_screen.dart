@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart'; // Đã gọi đúng HomeScreen của ông!
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart'; // 📌 Bổ sung thư viện này để Format tiền tệ!
+
+import 'home_screen.dart';
 import 'chat_ai_screen.dart';
 import 'transactions_screen.dart';
 import 'budget_screen.dart';
 import 'settings_screen.dart';
+import '../main.dart'; // Lấy biến toàn cục
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -12,15 +19,9 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen>
-    with SingleTickerProviderStateMixin {
+class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  late AnimationController _pulseController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _opacityAnimation;
-
-  // Dùng UniqueKey để ép HomeScreen gọi API mỗi khi mở lại
   late List<Widget> _pages = [
     HomeScreen(key: UniqueKey()),
     const TransactionsScreen(),
@@ -29,118 +30,122 @@ class _MainScreenState extends State<MainScreen>
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat();
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.5,
-    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
-    _opacityAnimation = Tween<double>(
-      begin: 0.4,
-      end: 0.0,
-    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       body: _pages[_currentIndex],
 
-      floatingActionButton: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          if (_currentIndex == 0)
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: Opacity(
-                    opacity: _opacityAnimation.value,
-                    child: FloatingActionButton.extended(
-                      heroTag: null,
-                      onPressed: null,
-                      backgroundColor: Colors.blueAccent,
-                      elevation: 0,
-                      label: const Text(
-                        "Nhập AI",
-                        style: TextStyle(color: Colors.transparent),
-                      ),
-                      icon: const Icon(
-                        Icons.auto_awesome,
-                        color: Colors.transparent,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-
-          _currentIndex == 0
-              ? FloatingActionButton.extended(
-                  backgroundColor: Colors.blueAccent,
-                  elevation: 4,
-                  onPressed: () => _goiAI(context),
-                  extendedPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 0,
-                  ),
-                  icon: const Icon(
-                    Icons.auto_awesome,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  label: const Text(
-                    "Nhập bằng AI",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                )
-              : FloatingActionButton(
-                  backgroundColor: Colors.blueAccent,
-                  elevation: 4,
-                  onPressed: () => _goiAI(context),
-                  child: const Icon(Icons.auto_awesome, color: Colors.white),
-                ),
-        ],
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.blueAccent,
+        elevation: 6,
+        shape: const CircleBorder(),
+        onPressed: _hienThiMenuNhapLieu,
+        child: const Icon(Icons.add, color: Colors.white, size: 35),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
 
       bottomNavigationBar: BottomAppBar(
         color: Colors.white,
         elevation: 15,
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8.0,
         child: SizedBox(
           height: 65,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildNavItem(Icons.pie_chart_rounded, "Tổng quan", 0),
-              _buildNavItem(Icons.receipt_long_rounded, "Thu chi", 1),
-              _buildNavItem(
-                Icons.account_balance_wallet_rounded,
-                "Ngân sách",
-                2,
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(Icons.pie_chart_rounded, "Tổng quan", 0),
+                    _buildNavItem(Icons.receipt_long_rounded, "Thu chi", 1),
+                  ],
+                ),
               ),
-              _buildNavItem(Icons.settings_rounded, "Cài đặt", 3),
+              const SizedBox(width: 48),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(
+                      Icons.account_balance_wallet_rounded,
+                      "Ngân sách",
+                      2,
+                    ),
+                    _buildNavItem(Icons.settings_rounded, "Cài đặt", 3),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _hienThiMenuNhapLieu() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "Thêm giao dịch",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.blueAccent,
+                  child: Icon(Icons.auto_awesome, color: Colors.white),
+                ),
+                title: const Text(
+                  "Nhập bằng AI",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text("Tự động nhận diện số tiền & danh mục"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _goiAI(context);
+                },
+              ),
+              const Divider(indent: 70),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.orange,
+                  child: Icon(Icons.edit_document, color: Colors.white),
+                ),
+                title: const Text(
+                  "Nhập thủ công",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text("Tự điền thông tin truyền thống"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _moFormNhapTay();
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -151,11 +156,363 @@ class _MainScreenState extends State<MainScreen>
     ).then((value) {
       setState(() {
         _currentIndex = 0;
-        _pages[0] = HomeScreen(
-          key: UniqueKey(),
-        ); // Ép HomeScreen "tái sinh" lấy data mới!
+        _pages[0] = HomeScreen(key: UniqueKey());
       });
     });
+  }
+
+  // --- HÀM XÂY CỬA THOÁT HIỂM: FORM NHẬP TAY (UI HIỆN ĐẠI) ---
+  Future<void> _moFormNhapTay() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    List<Map<String, dynamic>> danhMucList = [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? token =
+          userTokenGlobal.value ??
+          prefs.getString('jwt') ??
+          prefs.getString('token');
+
+      final response = await http.get(
+        Uri.parse('http://10.57.162.167:1337/api/categories'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+        for (var item in data) {
+          final attrs = item['attributes'] ?? item;
+          String tenDM = attrs['Name'] ?? 'Khác';
+          String tenKey = tenDM.toLowerCase().trim();
+
+          // 🎨 ĐỌC ICON VÀ MÀU TỪ STRAPI ĐỂ LÀM GIAO DIỆN
+          int? codePoint = int.tryParse(attrs['Icon'] ?? '');
+          IconData iconData = codePoint != null
+              ? IconData(codePoint, fontFamily: 'MaterialIcons')
+              : Icons.category_rounded;
+
+          Color colorData = Colors.blueGrey;
+          String colorStr = attrs['Color'] ?? '';
+          if (colorStr.isNotEmpty) {
+            try {
+              colorData = Color(int.parse(colorStr, radix: 16));
+            } catch (e) {}
+          }
+
+          // Cứu cánh cho danh mục cũ chưa cài màu
+          if (codePoint == null || colorStr.isEmpty) {
+            if (tenKey.contains('ăn')) {
+              iconData = Icons.fastfood_rounded;
+              colorData = Colors.orange;
+            } else if (tenKey.contains('giải') || tenKey.contains('chơi')) {
+              iconData = Icons.sports_esports_rounded;
+              colorData = Colors.purple;
+            } else if (tenKey.contains('học')) {
+              iconData = Icons.school_rounded;
+              colorData = Colors.blue;
+            } else if (tenKey.contains('nhà') ||
+                tenKey.contains('trọ') ||
+                tenKey.contains('wifi')) {
+              iconData = Icons.home_rounded;
+              colorData = Colors.teal;
+            }
+          }
+
+          danhMucList.add({
+            'id': item['documentId'] ?? item['id'].toString(),
+            'name': tenDM,
+            'icon': iconData, // Nhét thêm icon vào danh sách
+            'color': colorData, // Nhét thêm màu vào danh sách
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Lỗi tải danh mục form: $e");
+    }
+
+    if (mounted) Navigator.pop(context);
+
+    if (danhMucList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("❌ Không tải được danh mục, kiểm tra mạng!"),
+        ),
+      );
+      return;
+    }
+
+    final tienController = TextEditingController();
+    final ghiChuController = TextEditingController();
+    String? selectedCategoryId =
+        danhMucList[0]['id']; // Mặc định chọn cái đầu tiên
+
+    if (mounted) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setStateSheet) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                ),
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  left: 24,
+                  right: 24,
+                  top: 24,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: Colors.blue,
+                            size: 30,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            "Ghi chép nhanh",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 25),
+
+                      // 📌 UI MỚI: THANH CUỘN CHỌN DANH MỤC
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Danh mục chi tiêu",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 90, // Đủ cao để chứa Icon + Text
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal, // Cuộn ngang
+                          itemCount: danhMucList.length,
+                          itemBuilder: (context, index) {
+                            final dm = danhMucList[index];
+                            final isSelected =
+                                selectedCategoryId ==
+                                dm['id']; // Kiểm tra xem có đang được chọn không
+
+                            return GestureDetector(
+                              onTap: () {
+                                setStateSheet(() {
+                                  selectedCategoryId =
+                                      dm['id']; // Cập nhật id khi bấm
+                                });
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 85,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  // Đổi màu nền và viền nếu được chọn
+                                  color: isSelected
+                                      ? dm['color'].withOpacity(0.15)
+                                      : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? dm['color']
+                                        : Colors.grey.shade200,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      dm['icon'],
+                                      color: isSelected
+                                          ? dm['color']
+                                          : Colors.grey.shade400,
+                                      size: 32,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      dm['name'],
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        color: isSelected
+                                            ? dm['color']
+                                            : Colors.grey.shade600,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow
+                                          .ellipsis, // Chữ dài quá thì hiện ...
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+
+                      TextField(
+                        controller: tienController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [CurrencyInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: "Số tiền (VNĐ)",
+                          prefixIcon: const Icon(
+                            Icons.monetization_on,
+                            color: Colors.orange,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextField(
+                        controller: ghiChuController,
+                        decoration: InputDecoration(
+                          labelText: "Ghi chú (Ví dụ: Ăn phở)",
+                          prefixIcon: const Icon(
+                            Icons.edit,
+                            color: Colors.grey,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 55),
+                          backgroundColor: Colors.blueAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        onPressed: () async {
+                          if (tienController.text.isEmpty ||
+                              ghiChuController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "⚠️ Vui lòng nhập đủ tiền và ghi chú!",
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          String chuoiSoSanh = tienController.text.replaceAll(
+                            RegExp(r'[^0-9]'),
+                            '',
+                          );
+                          int soTienChuan = int.tryParse(chuoiSoSanh) ?? 0;
+
+                          final url = Uri.parse(
+                            'http://10.57.162.167:1337/api/transactions',
+                          );
+                          try {
+                            final prefs = await SharedPreferences.getInstance();
+                            String? token =
+                                userTokenGlobal.value ??
+                                prefs.getString('jwt') ??
+                                prefs.getString('token');
+                            int? myId = userIdGlobal.value;
+
+                            final response = await http.post(
+                              url,
+                              headers: {
+                                'Content-Type': 'application/json',
+                                if (token != null)
+                                  'Authorization': 'Bearer $token',
+                              },
+                              body: json.encode({
+                                "data": {
+                                  "amount": soTienChuan,
+                                  "note": ghiChuController.text,
+                                  "date": DateTime.now()
+                                      .toUtc()
+                                      .toIso8601String(),
+                                  "category": [selectedCategoryId],
+                                  if (myId != null) "user": [myId.toString()],
+                                },
+                              }),
+                            );
+
+                            if (response.statusCode == 201 ||
+                                response.statusCode == 200) {
+                              if (!mounted) return;
+
+                              Navigator.pop(ctx);
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("🎉 Đã lưu vào sổ!"),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+
+                              refreshDataGlobal.value = true;
+                              setState(() {
+                                _currentIndex = 0;
+                                _pages[0] = HomeScreen(key: UniqueKey());
+                              });
+                            } else {
+                              debugPrint("Lỗi Strapi: ${response.body}");
+                            }
+                          } catch (e) {
+                            debugPrint("Lỗi gửi tay: $e");
+                          }
+                        },
+                        child: const Text(
+                          "Lưu Giao Dịch",
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
   }
 
   Widget _buildNavItem(IconData icon, String label, int index) {
@@ -164,19 +521,15 @@ class _MainScreenState extends State<MainScreen>
       onTap: () => setState(() => _currentIndex = index),
       borderRadius: BorderRadius.circular(15),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: EdgeInsets.only(bottom: isSelected ? 2 : 0),
-              child: Icon(
-                icon,
-                color: isSelected ? Colors.blueAccent : Colors.grey.shade400,
-                size: isSelected ? 28 : 24,
-              ),
+            Icon(
+              icon,
+              color: isSelected ? Colors.blueAccent : Colors.grey.shade400,
+              size: isSelected ? 28 : 24,
             ),
             const SizedBox(height: 2),
             Text(
@@ -190,6 +543,32 @@ class _MainScreenState extends State<MainScreen>
           ],
         ),
       ),
+    );
+  }
+}
+
+// 📌 CLASS XỬ LÝ ĐỊNH DẠNG DẤU CHẤM NGÀN (2.000.000)
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
+    // Lọc bỏ mọi thứ không phải là số
+    String digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.isEmpty) return newValue.copyWith(text: '');
+
+    // Ép kiểu về int và format lại theo chuẩn Việt Nam
+    final int value = int.parse(digitsOnly);
+    final String formatted = NumberFormat(
+      '#,###',
+      'vi_VN',
+    ).format(value).replaceAll(',', '.'); // Đổi phẩy thành chấm cho hợp nhãn VN
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

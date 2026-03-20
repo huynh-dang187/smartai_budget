@@ -6,6 +6,8 @@ import 'package:intl/intl.dart'; // Format tiền và ngày tháng
 import 'package:google_generative_ai/google_generative_ai.dart'; // Não AI
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Lấy key bí mật
 import '../main.dart'; // Nạp cái này để lấy biến userTokenGlobal
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -238,7 +240,7 @@ class HomeScreenState extends State<HomeScreen> {
           .join('\n');
 
       final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-      final model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
+      final model = GenerativeModel(model: 'gemini-pro', apiKey: apiKey);
 
       final prompt =
           '''
@@ -667,6 +669,263 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // --- HÀM XÂY CỬA THOÁT HIỂM: FORM NHẬP TAY ---
+  Future<void> _moFormNhapTay() async {
+    // 1. Hiện loading đi lấy danh mục
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    List<Map<String, dynamic>> danhMucList = [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? token =
+          userTokenGlobal.value ??
+          prefs.getString('jwt') ??
+          prefs.getString('token');
+
+      // Lấy danh mục từ Strapi
+      final response = await http.get(
+        Uri.parse('http://10.57.162.167:1337/api/categories'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body)['data'];
+        for (var item in data) {
+          danhMucList.add({
+            'id': item['documentId'] ?? item['id'].toString(),
+            'name': (item['attributes'] ?? item)['Name'] ?? 'Khác',
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Lỗi tải danh mục form: $e");
+    }
+
+    if (mounted) Navigator.pop(context); // Tắt loading
+
+    if (danhMucList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("❌ Không tải được danh mục, kiểm tra mạng!"),
+        ),
+      );
+      return;
+    }
+
+    // 2. Khởi tạo Controller cho Form
+    final tienController = TextEditingController();
+    final ghiChuController = TextEditingController();
+    String? selectedCategoryId = danhMucList[0]['id'];
+
+    // 3. Bật Form lên (Dùng BottomSheet)
+    if (mounted) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true, // Cho phép đẩy form lên khi hiện bàn phím
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setStateSheet) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                ),
+                padding: EdgeInsets.only(
+                  bottom:
+                      MediaQuery.of(context).viewInsets.bottom +
+                      20, // Nâng lên tránh bàn phím đè
+                  left: 24,
+                  right: 24,
+                  top: 24,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.edit_note_rounded,
+                            color: Colors.blue,
+                            size: 30,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            "Nhập chi tiêu",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 25),
+
+                      // Chọn danh mục
+                      DropdownButtonFormField<String>(
+                        value: selectedCategoryId,
+                        decoration: InputDecoration(
+                          labelText: "Chọn danh mục",
+                          prefixIcon: const Icon(
+                            Icons.category,
+                            color: Colors.teal,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        items: danhMucList.map((dm) {
+                          return DropdownMenuItem<String>(
+                            value: dm['id'],
+                            child: Text(dm['name']),
+                          );
+                        }).toList(),
+                        onChanged: (val) =>
+                            setStateSheet(() => selectedCategoryId = val),
+                      ),
+                      const SizedBox(height: 15),
+
+                      // Nhập tiền (Cấm nhập chữ)
+                      TextField(
+                        controller: tienController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: InputDecoration(
+                          labelText: "Số tiền (VNĐ)",
+                          prefixIcon: const Icon(
+                            Icons.monetization_on,
+                            color: Colors.orange,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+
+                      // Nhập ghi chú
+                      TextField(
+                        controller: ghiChuController,
+                        decoration: InputDecoration(
+                          labelText: "Ghi chú (Ví dụ: Ăn phở)",
+                          prefixIcon: const Icon(
+                            Icons.edit,
+                            color: Colors.grey,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+
+                      // Nút Lưu
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 55),
+                          backgroundColor: Colors.blueAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        onPressed: () async {
+                          if (tienController.text.isEmpty ||
+                              ghiChuController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "⚠️ Vui lòng nhập đủ tiền và ghi chú!",
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.pop(ctx); // Đóng form
+
+                          // GỌI API LƯU LÊN STRAPI
+                          final url = Uri.parse(
+                            'http://10.57.162.167:1337/api/transactions',
+                          );
+                          try {
+                            final prefs = await SharedPreferences.getInstance();
+                            String? token =
+                                userTokenGlobal.value ??
+                                prefs.getString('jwt') ??
+                                prefs.getString('token');
+                            int? myId = userIdGlobal.value;
+
+                            final response = await http.post(
+                              url,
+                              headers: {
+                                'Content-Type': 'application/json',
+                                if (token != null)
+                                  'Authorization': 'Bearer $token',
+                              },
+                              body: json.encode({
+                                "data": {
+                                  "amount":
+                                      int.tryParse(tienController.text) ?? 0,
+                                  "note": ghiChuController.text,
+                                  "date": DateTime.now()
+                                      .toUtc()
+                                      .toIso8601String(),
+                                  "category": [selectedCategoryId],
+                                  if (myId != null) "user": [myId.toString()],
+                                },
+                              }),
+                            );
+
+                            if (response.statusCode == 201 ||
+                                response.statusCode == 200) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text("🎉 Đã lưu vào sổ!"),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              layDuLieuTuStrapi(); // Load lại màn hình Tổng quan
+                              refreshDataGlobal.value =
+                                  true; // Rung chuông báo cho màn Thu chi & Ngân sách
+                            } else {
+                              debugPrint("Lỗi Strapi: ${response.body}");
+                            }
+                          } catch (e) {
+                            debugPrint("Lỗi gửi tay: $e");
+                          }
+                        },
+                        child: const Text(
+                          "Lưu Giao Dịch",
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -685,6 +944,7 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+
       body: dangTaiDuLieu
           ? const Center(child: CircularProgressIndicator())
           : danhSachGiaoDich.isEmpty
@@ -801,6 +1061,8 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const Divider(thickness: 2),
+
+                // ---------------------------
                 // --- KHU VỰC 3: DANH SÁCH CHI TIÊU ĐÃ ĐỒNG BỘ ---
                 Expanded(
                   child: ListView.builder(
