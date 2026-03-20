@@ -387,63 +387,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
               },
             ),
-            // --- 2. NHÓM CÀI ĐẶT: GIAO DIỆN ---
-            const Padding(
-              padding: EdgeInsets.only(left: 8, bottom: 10),
-              child: Text(
-                "GIAO DIỆN",
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Column(
-                children: [
-                  // Nút bật tắt Dark Mode
-                  SwitchListTile(
-                    title: const Text(
-                      "Chế độ tối (Dark Mode)",
-                      style: TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    secondary: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.dark_mode_rounded,
-                        color: Colors.amber,
-                        size: 20,
-                      ),
-                    ),
-                    value: false, // Ép nó luôn luôn tắt ở giao diện
-                    activeColor: Colors.blueAccent,
-                    onChanged: (bool value) {
-                      // Không đổi màu app nữa, hiện ngay cái bảng thông báo lên
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            "✨ Chức năng Dark Mode đang được phát triển!",
-                          ),
-                          backgroundColor: Colors.blueAccent,
-                          behavior: SnackBarBehavior
-                              .floating, // Bảng nổi lên cho sang chảnh
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
 
             const SizedBox(height: 20),
 
