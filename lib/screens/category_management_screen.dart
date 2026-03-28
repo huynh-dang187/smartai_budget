@@ -74,7 +74,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
   // --- GỌI API LẤY DANH MỤC TỪ STRAPI ---
   Future<void> _taiDanhSachTuStrapi() async {
-    final url = Uri.parse('http://10.57.162.167:1337/api/categories');
+    final url = Uri.parse('http://139.59.242.7:1337/api/categories');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -234,7 +234,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         // Gọi API bắn dữ liệu lên Strapi
                         try {
                           final url = Uri.parse(
-                            'http://10.57.162.167:1337/api/categories',
+                            'http://139.59.242.7:1337/api/categories',
                           );
                           final response = await http.post(
                             url,
@@ -437,7 +437,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         // GỌI API PUT ĐỂ UPDATE
                         try {
                           final url = Uri.parse(
-                            'http://10.57.162.167:1337/api/categories/$idDM',
+                            'http://139.59.242.7:1337/api/categories/$idDM',
                           );
                           final response = await http.put(
                             url,
@@ -501,7 +501,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
 
     try {
-      final url = Uri.parse('http://10.57.162.167:1337/api/categories/$idDM');
+      final url = Uri.parse('http://139.59.242.7:1337/api/categories/$idDM');
       final response = await http.delete(url);
 
       if (context.mounted) Navigator.pop(context); // Tắt vòng xoay

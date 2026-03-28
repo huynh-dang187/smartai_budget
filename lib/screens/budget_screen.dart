@@ -39,7 +39,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   // BƯỚC 1: LẤY DANH MỤC (MỚI)
   Future<void> _taiDanhSachDanhMucTuStrapi() async {
-    final url = Uri.parse('http://10.57.162.167:1337/api/categories');
+    final url = Uri.parse('http://139.59.242.7:1337/api/categories');
     try {
       // 🔑 LẤY TOKEN
       String? token = _prefs.getString('jwt') ?? _prefs.getString('token');
@@ -143,7 +143,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Future<void> _dongBoDuLieuTuStrapi() async {
     int? myId = userIdGlobal.value;
     final url = Uri.parse(
-      'http://10.57.162.167:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
+      'http://139.59.242.7:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
     );
     try {
       // 🔑 LẤY TOKEN

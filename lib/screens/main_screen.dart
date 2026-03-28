@@ -178,7 +178,7 @@ class _MainScreenState extends State<MainScreen> {
           prefs.getString('token');
 
       final response = await http.get(
-        Uri.parse('http://10.57.162.167:1337/api/categories'),
+        Uri.parse('http://139.59.242.7:1337/api/categories'),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
@@ -439,7 +439,7 @@ class _MainScreenState extends State<MainScreen> {
                           int soTienChuan = int.tryParse(chuoiSoSanh) ?? 0;
 
                           final url = Uri.parse(
-                            'http://10.57.162.167:1337/api/transactions',
+                            'http://139.59.242.7:1337/api/transactions',
                           );
                           try {
                             final prefs = await SharedPreferences.getInstance();

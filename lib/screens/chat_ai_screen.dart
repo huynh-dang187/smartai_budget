@@ -54,7 +54,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   }
 
   Future<void> _taiDanhSachDanhMuc() async {
-    final url = Uri.parse('http://10.57.162.167:1337/api/categories');
+    final url = Uri.parse('http://139.59.242.7:1337/api/categories');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
@@ -135,7 +135,7 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     String note,
     String categoryName,
   ) async {
-    final url = Uri.parse('http://10.57.162.167:1337/api/transactions');
+    final url = Uri.parse('http://139.59.242.7:1337/api/transactions');
     String tenChuan = categoryName.trim().toLowerCase();
     dynamic categoryId = _tuDienDanhMuc[tenChuan];
 

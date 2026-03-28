@@ -46,7 +46,7 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       http.Response response;
       final String ipServer =
-          'http://10.57.162.167:1337'; // CHÚ Ý: Cập nhật IP của ông ở đây nếu cần
+          'http://139.59.242.7:1337'; // CHÚ Ý: Cập nhật IP của ông ở đây nếu cần
 
       if (_isLogin) {
         // --- LUỒNG ĐĂNG NHẬP ---

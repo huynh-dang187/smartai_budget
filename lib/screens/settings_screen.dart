@@ -53,7 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // 3. GẮN THẦN CHÚ LỌC USER VÀO URL
       final url = Uri.parse(
-        'http://10.57.162.167:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
+        'http://139.59.242.7:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
       );
 
       // 4. GẮN VÉ VIP VÀO REQUEST
@@ -229,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       };
 
       // 3. LÊN STRAPI LẤY DANH SÁCH VÀ XÓA TỪNG MÓN
-      final url = Uri.parse('http://10.57.162.167:1337/api/transactions');
+      final url = Uri.parse('http://139.59.242.7:1337/api/transactions');
       final response = await http.get(url, headers: headers); // Đã thêm vé VIP
 
       if (response.statusCode == 200) {
@@ -239,7 +239,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           var id = item['documentId'] ?? item['id'];
           // GỌI LỆNH TRẢM QUYẾT TỪNG ITEM MỘT (Phải có vé VIP)
           await http.delete(
-            Uri.parse('http://10.57.162.167:1337/api/transactions/$id'),
+            Uri.parse('http://139.59.242.7:1337/api/transactions/$id'),
             headers: headers,
           );
         }
