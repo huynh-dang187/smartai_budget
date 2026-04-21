@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../main.dart'; // Nạp biến userTokenGlobal và userIdGlobal
 
 class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({super.key});
@@ -74,13 +75,35 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
   // --- GỌI API LẤY DANH MỤC TỪ STRAPI ---
   Future<void> _taiDanhSachTuStrapi() async {
-    final url = Uri.parse('http://139.59.242.7:1337/api/categories');
+    int? myId = userIdGlobal.value;
+    String? token = userTokenGlobal.value;
+
+    // 🔒 MIDDLEWARE will filter by user on backend
+    final url = Uri.parse(
+      'http://139.59.242.7:1337/api/categories?populate=user',
+    );
     try {
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        List allCategories = data['data'] ?? [];
+
+        // FILTER: Backend now explicitly filters - safety check only
+        final List giaoDichLocRoi = allCategories.where((c) {
+          final userObj = c['attributes']?['user']?['data'];
+          if (userObj == null) return false; // Reject if no user
+          final userId = userObj['id'] ?? userObj['attributes']?['id'];
+          return userId == myId;
+        }).toList();
+        debugPrint(
+          "📊 Categories filtered: ${giaoDichLocRoi.length} for user $myId",
+        );
+
         setState(() {
-          _danhSachDanhMuc = data['data'];
+          _danhSachDanhMuc = giaoDichLocRoi;
           _isLoading = false;
         });
       }
@@ -236,16 +259,28 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                           final url = Uri.parse(
                             'http://139.59.242.7:1337/api/categories',
                           );
+                          String? token = userTokenGlobal.value;
+                          int? myId = userIdGlobal.value;
+
                           final response = await http.post(
                             url,
-                            headers: {'Content-Type': 'application/json'},
+                            headers: {
+                              'Content-Type': 'application/json',
+                              if (token != null)
+                                'Authorization': 'Bearer $token',
+                            },
                             body: json.encode({
                               "data": {
                                 "Name": tenDM,
                                 "Icon": iconDuocChon.codePoint.toString(),
                                 "Color": mauDuocChon.value.toRadixString(16),
+                                // ⚠️ Bỏ "user" - để Strapi tự set từ JWT token
                               },
                             }),
+                          );
+
+                          debugPrint(
+                            "📄 CATEGORY POST: ${response.statusCode} - ${response.body}",
                           );
 
                           if (response.statusCode == 200 ||
@@ -501,8 +536,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
 
     try {
+      String? token = userTokenGlobal.value;
       final url = Uri.parse('http://139.59.242.7:1337/api/categories/$idDM');
-      final response = await http.delete(url);
+      final response = await http.delete(
+        url,
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+      );
 
       if (context.mounted) Navigator.pop(context); // Tắt vòng xoay
 

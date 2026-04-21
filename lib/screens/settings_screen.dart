@@ -51,9 +51,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           prefs.getString('jwt') ??
           prefs.getString('token');
 
-      // 3. GẮN THẦN CHÚ LỌC USER VÀO URL
+      // 3. 🔒 MIDDLEWARE will filter by user on backend
       final url = Uri.parse(
-        'http://139.59.242.7:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
+        'http://139.59.242.7:1337/api/transactions?populate=category&populate=user',
       );
 
       // 4. GẮN VÉ VIP VÀO REQUEST
@@ -68,7 +68,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List giaoDich = data['data'];
+        List allTransactions = data['data'] ?? [];
+
+        // FILTER: Backend now explicitly filters - safety check only
+        final List giaoDich = allTransactions.where((t) {
+          final userObj = t['attributes']?['user']?['data'];
+          if (userObj == null) return false; // Reject if no user
+          final userId = userObj['id'] ?? userObj['attributes']?['id'];
+          return userId == myId;
+        }).toList();
+        debugPrint(
+          "📊 Excel filtered transactions: ${giaoDich.length} for user $myId",
+        );
 
         // 3. Khởi tạo file Excel
         var excel = Excel.createExcel();

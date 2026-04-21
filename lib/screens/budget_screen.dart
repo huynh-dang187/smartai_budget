@@ -39,7 +39,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   // BƯỚC 1: LẤY DANH MỤC (MỚI)
   Future<void> _taiDanhSachDanhMucTuStrapi() async {
-    final url = Uri.parse('http://139.59.242.7:1337/api/categories');
+    int? myId = userIdGlobal.value; // 👈 Lấy ID người dùng ra
+    // 🔒 MIDDLEWARE will filter by user on backend
+    final url = Uri.parse(
+      'http://139.59.242.7:1337/api/categories?populate=user',
+    );
     try {
       // 🔑 LẤY TOKEN
       String? token = _prefs.getString('jwt') ?? _prefs.getString('token');
@@ -55,7 +59,18 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List categories = data['data'];
+        List allCategories = data['data'] ?? [];
+
+        // 🔒 FILTER: Show if NO user field (legacy) OR user matches
+        final List categories = allCategories.where((c) {
+          final userObj = c['attributes']?['user']?['data'];
+          if (userObj == null) return true; // Show legacy
+          final userId = userObj['id'] ?? userObj['attributes']?['id'];
+          return userId == myId;
+        }).toList();
+        debugPrint(
+          "📊 Budget filtered categories: ${categories.length} for user $myId",
+        );
 
         List<Map<String, dynamic>> dmTam = [];
         for (var item in categories) {
@@ -142,8 +157,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
   // BƯỚC 3: LẤY GIAO DỊCH TÍNH TIỀN
   Future<void> _dongBoDuLieuTuStrapi() async {
     int? myId = userIdGlobal.value;
+    // 🔒 MIDDLEWARE will filter by user on backend
     final url = Uri.parse(
-      'http://139.59.242.7:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
+      'http://139.59.242.7:1337/api/transactions?populate=category&populate=user',
     );
     try {
       // 🔑 LẤY TOKEN
@@ -161,14 +177,38 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List giaoDich = data['data'];
+        List allTransactions = data['data'] ?? [];
+
+        // 🔒 FILTER: Try multiple paths to find user
+        final List giaoDich = allTransactions.where((t) {
+          int? userId;
+          
+          // Path 1: Direct user.id
+          if (t['user'] is Map && t['user']['id'] != null) {
+            userId = t['user']['id'];
+          }
+          // Path 2: Nested user.data.id
+          else if (t['user'] is Map && t['user']['data'] is Map && t['user']['data']['id'] != null) {
+            userId = t['user']['data']['id'];
+          }
+          // Path 3: Via attributes
+          else if (t['attributes'] is Map && t['attributes']['user'] is Map) {
+            userId = t['attributes']['user']['data']?['id'] ?? t['attributes']['user']['id'];
+          }
+          
+          if (userId == null) return false;
+          return userId == myId;
+        }).toList();
+        debugPrint(
+          "📊 Budget filtered transactions: ${giaoDich.length} for user $myId",
+        );
 
         DateTime now = DateTime.now();
         double tongTienThangNay = 0;
 
         Map<String, double> tienTheoDanhMuc = {};
 
-        for (var gd in giaoDich) {
+        for (var gd in allTransactions) {
           final attrs = gd['attributes'] ?? gd;
           if (attrs['date'] == null) continue;
           DateTime dt = DateTime.parse(attrs['date']).toLocal();

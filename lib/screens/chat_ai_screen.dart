@@ -54,27 +54,39 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
   }
 
   Future<void> _taiDanhSachDanhMuc() async {
+    String? token = userTokenGlobal.value;
     final url = Uri.parse('http://139.59.242.7:1337/api/categories');
     try {
-      final response = await http.get(url);
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List danhSach = data['data'];
 
         setState(() {
           for (var item in danhSach) {
-            String tenDM = item['Name']?.toString() ?? 'Khác';
-            var idDM = item['documentId'] ?? item['id'];
+            String tenDM =
+                item['attributes']?['Name'] ??
+                item['Name']?.toString() ??
+                'Khác';
+            var idDM = item['id'] ?? item['documentId'];
 
             if (idDM != null) {
               _tuDienDanhMuc[tenDM.trim().toLowerCase()] = idDM;
             }
           }
         });
-        debugPrint("📚 TỪ ĐIỂN ĐÃ TẢI THÀNH CÔNG: $_tuDienDanhMuc");
+        debugPrint("📚 TỪ ĐIỂN ĐÃ TẢI: ${_tuDienDanhMuc.length} categories");
+      } else {
+        debugPrint("❌ Category fetch failed: ${response.statusCode}");
       }
     } catch (e) {
-      debugPrint("❌ Lỗi tải danh mục (sập hàm): $e");
+      debugPrint("❌ Lỗi tải danh mục: $e");
     }
   }
 
@@ -146,22 +158,33 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
     String? token = userTokenGlobal.value;
     int? myId = userIdGlobal.value;
 
+    debugPrint("🔍 [ChatAI] Token: ${token?.substring(0, 20)}...");
+    debugPrint("🔍 [ChatAI] User ID: $myId");
+    debugPrint("🔍 [ChatAI] Category ID: $categoryId");
+
     try {
+      final body = {
+        "data": {
+          "amount": amount,
+          "note": note,
+          "date": DateTime.now().toUtc().toIso8601String(),
+          "category": categoryId,
+        },
+      };
+
+      debugPrint("📤 [ChatAI] Sending POST: ${json.encode(body)}");
+
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
         },
-        body: json.encode({
-          "data": {
-            "amount": amount,
-            "note": note,
-            "date": DateTime.now().toUtc().toIso8601String(),
-            "category": [categoryId.toString()],
-            if (myId != null) "user": [myId.toString()],
-          },
-        }),
+        body: json.encode(body),
+      );
+
+      debugPrint(
+        "📥 [ChatAI] Response ${response.statusCode}: ${response.body.substring(0, 200)}",
       );
 
       if (response.statusCode == 201 || response.statusCode == 200) {
@@ -172,13 +195,15 @@ class _ChatAIScreenState extends State<ChatAIScreen> {
               backgroundColor: Colors.green,
             ),
           );
+          // Wait for backend to process
+          await Future.delayed(Duration(milliseconds: 800));
           Navigator.pop(context);
         }
       } else {
-        debugPrint("❌ Lỗi Strapi từ chối: ${response.body}");
+        debugPrint("❌ [ChatAI] Error ${response.statusCode}: ${response.body}");
       }
     } catch (e) {
-      debugPrint("❌ Lỗi mạng không gửi được: $e");
+      debugPrint("❌ [ChatAI] Network error: $e");
     }
   }
 

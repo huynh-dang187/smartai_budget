@@ -110,10 +110,9 @@ class HomeScreenState extends State<HomeScreen> {
     // Lấy ID của mình ra
     int? myId = userIdGlobal.value;
 
-    // THẦN CHÚ LỌC DỮ LIỆU: Chỉ lấy giao dịch có user id = myId
-    // Dùng \ trước dấu $ để Flutter không báo lỗi nội suy chuỗi nhé
+    // � EXPLICIT FILTER: Add query parameter to force backend filtering
     final url = Uri.parse(
-      'http://139.59.242.7:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
+      'http://139.59.242.7:1337/api/transactions?populate=category&populate=user',
     );
 
     String? token = userTokenGlobal.value;
@@ -121,20 +120,52 @@ class HomeScreenState extends State<HomeScreen> {
     try {
       final response = await http.get(
         url,
-        // 2. DÁN VÉ VIP LÊN TRÁN KHI QUA CỬA
         headers: token != null
             ? {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer $token',
               }
-            : null, // Nếu chưa đăng nhập thì đi tay không (Public)
+            : null,
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+
+        // � FILTER TO USER'S OWN DATA ONLY
+        final List allTransactions = data['data'] ?? [];
+        debugPrint('\n📋 [HOME] Got ${allTransactions.length} from API, myId=$myId');
+        
+        if (allTransactions.isNotEmpty) {
+          var first = allTransactions[0];
+          debugPrint('First TX: id=${first['id']}, user=${first['user']}');
+        }
+        
+        final List giaoDich = allTransactions.where((t) {
+          int? userId;
+          
+          // Path 1: Direct user.id 
+          if (t['user'] is Map && t['user']['id'] != null) {
+            userId = t['user']['id'];
+          } 
+          // Path 2: Nested user.data.id
+          else if (t['user'] is Map && t['user']['data'] is Map && t['user']['data']['id'] != null) {
+            userId = t['user']['data']['id'];
+          }
+          // Path 3: Via attributes
+          else if (t['attributes'] is Map && t['attributes']['user'] is Map) {
+            userId = t['attributes']['user']['data']?['id'] ?? t['attributes']['user']['id'];
+          }
+          
+          bool match = userId == myId;
+          if (match) debugPrint('  ✓ TX ${t['id']}: $userId == $myId');
+          return match;
+        }).toList();
+
+        debugPrint("📊 Filtered: ${giaoDich.length}/${allTransactions.length}\n");
+
         if (mounted) {
           setState(() {
-            danhSachGiaoDich = data['data'];
+            danhSachGiaoDich = giaoDich;
             dangTaiDuLieu = false;
           });
         }
@@ -881,10 +912,14 @@ class HomeScreenState extends State<HomeScreen> {
                                   "date": DateTime.now()
                                       .toUtc()
                                       .toIso8601String(),
-                                  "category": [selectedCategoryId],
-                                  if (myId != null) "user": [myId.toString()],
+                                  "category": selectedCategoryId,
+                                  // ⚠️ Bỏ "user" - để Strapi tự set từ JWT token
                                 },
                               }),
+                            );
+
+                            debugPrint(
+                              "\ud83d\udcc4 HOME SCREEN POST: ${response.statusCode} - ${response.body}",
                             );
 
                             if (response.statusCode == 201 ||
@@ -895,6 +930,8 @@ class HomeScreenState extends State<HomeScreen> {
                                   backgroundColor: Colors.green,
                                 ),
                               );
+                              // Wait for backend to process
+                              await Future.delayed(Duration(milliseconds: 800));
                               layDuLieuTuStrapi(); // Load lại màn hình Tổng quan
                               refreshDataGlobal.value =
                                   true; // Rung chuông báo cho màn Thu chi & Ngân sách

@@ -463,10 +463,19 @@ class _MainScreenState extends State<MainScreen> {
                                   "date": DateTime.now()
                                       .toUtc()
                                       .toIso8601String(),
-                                  "category": [selectedCategoryId],
-                                  if (myId != null) "user": [myId.toString()],
+                                  "category": selectedCategoryId,
+                                  // ⚠️ BỎ "user" - để Strapi tự set từ JWT token
                                 },
                               }),
+                            );
+
+                            debugPrint(
+                              "📤 POST BODY: ${json.encode({
+                                "data": {"amount": soTienChuan, "note": ghiChuController.text, "category": selectedCategoryId},
+                              })}",
+                            );
+                            debugPrint(
+                              "📥 RESPONSE: ${response.statusCode} - ${response.body}",
                             );
 
                             if (response.statusCode == 201 ||
@@ -488,10 +497,10 @@ class _MainScreenState extends State<MainScreen> {
                                 _pages[0] = HomeScreen(key: UniqueKey());
                               });
                             } else {
-                              debugPrint("Lỗi Strapi: ${response.body}");
+                              debugPrint("❌ Lỗi Strapi: ${response.body}");
                             }
                           } catch (e) {
-                            debugPrint("Lỗi gửi tay: $e");
+                            debugPrint("❌ Lỗi gửi: $e");
                           }
                         },
                         child: const Text(

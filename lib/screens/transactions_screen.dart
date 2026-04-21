@@ -24,13 +24,40 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     _layDuLieuTuStrapi();
   }
 
+  // Lấy icon danh mục dựa trên tên
+  IconData _layIconDanhMuc(String tenDanhMuc) {
+    final ten = tenDanhMuc.toLowerCase();
+    if (ten.contains('ăn') || ten.contains('uống')) return Icons.fastfood_rounded;
+    if (ten.contains('đi')) return Icons.directions_car_rounded;
+    if (ten.contains('học')) return Icons.school_rounded;
+    if (ten.contains('giải trí')) return Icons.sports_esports_rounded;
+    if (ten.contains('nhà') || ten.contains('trọ')) return Icons.home_rounded;
+    if (ten.contains('sức khỏe') || ten.contains('y tế')) return Icons.health_and_safety_rounded;
+    if (ten.contains('quần áo')) return Icons.shopping_bag_rounded;
+    return Icons.receipt_long_rounded;
+  }
+
+  // Lấy màu danh mục
+  Color _layMauDanhMuc(String tenDanhMuc) {
+    final ten = tenDanhMuc.toLowerCase();
+    if (ten.contains('ăn') || ten.contains('uống')) return Colors.orange;
+    if (ten.contains('đi')) return Colors.blue;
+    if (ten.contains('học')) return Colors.purple;
+    if (ten.contains('giải trí')) return Colors.pink;
+    if (ten.contains('nhà') || ten.contains('trọ')) return Colors.teal;
+    if (ten.contains('sức khỏe') || ten.contains('y tế')) return Colors.green;
+    if (ten.contains('quần áo')) return Colors.indigo;
+    return Colors.grey;
+  }
+
   Future<void> _layDuLieuTuStrapi() async {
     int? myId = userIdGlobal.value;
+    // 🔒 MIDDLEWARE will filter by user on backend
     final url = Uri.parse(
-      'http://139.59.242.7:1337/api/transactions?populate=*&filters[user][id][\$eq]=$myId',
+      'http://139.59.242.7:1337/api/transactions?populate=category&populate=user',
     );
     try {
-      // 1. Lấy Token từ bộ nhớ ra (Ông nhớ check lại tên key 'token' xem đúng với tên lúc ông lưu ở màn hình Login không nhé)
+      // 1. Lấy Token từ bộ nhớ ra
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString(
         'jwt_token',
@@ -47,26 +74,75 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        List allTransactions = data['data'] ?? [];
+
+        debugPrint('\n🔍 [TX_SCREEN] Got ${allTransactions.length} transactions');
+        if (allTransactions.isNotEmpty) {
+          var first = allTransactions[0];
+          debugPrint('First TX keys: ${first.keys.toList()}');
+          debugPrint('First TX user: ${first['user']}');
+        }
+
+        // 🔒 BACKEND NOW FILTERS - Keep this as double-check only
+        // Try multiple paths to find user ID
+        final List giaoDichLocRoi = allTransactions.where((t) {
+          int? userId;
+          
+          // Path 1: Direct user.id (from POST response format)
+          if (t['user'] is Map && t['user']['id'] != null) {
+            userId = t['user']['id'];
+            debugPrint('TX ${t['id']}: Path 1 (user.id) -> $userId');
+          }
+          // Path 2: Nested user.data.id
+          else if (t['user'] is Map && t['user']['data'] is Map && t['user']['data']['id'] != null) {
+            userId = t['user']['data']['id'];
+            debugPrint('TX ${t['id']}: Path 2 (user.data.id) -> $userId');
+          }
+          // Path 3: Via attributes
+          else if (t['attributes'] is Map && t['attributes']['user'] is Map) {
+            var userObj = t['attributes']['user'];
+            userId = userObj['data']?['id'] ?? userObj['id'];
+            debugPrint('TX ${t['id']}: Path 3 (attributes.user) -> $userId');
+          }
+          
+          if (userId == null) {
+            debugPrint('TX ${t['id']}: ❌ NO USER FOUND');
+            return false;
+          }
+          
+          bool match = userId == myId;
+          debugPrint('TX ${t['id']}: $userId == $myId ? $match');
+          return match;
+        }).toList();
+        
+        debugPrint("📊 After filter: ${giaoDichLocRoi.length}/${allTransactions.length} for user $myId\n");
+
         setState(() {
-          _toanBoGiaoDich = data['data']
+          _toanBoGiaoDich = giaoDichLocRoi
             ..sort((a, b) {
-              DateTime dateA = DateTime.parse(
-                a['date'] ?? DateTime.now().toIso8601String(),
-              );
-              DateTime dateB = DateTime.parse(
-                b['date'] ?? DateTime.now().toIso8601String(),
-              );
-              return dateB.compareTo(dateA);
+              try {
+                final attrsA = a['attributes'] ?? a;
+                final attrsB = b['attributes'] ?? b;
+                DateTime dateA = DateTime.parse(
+                  attrsA['date'] ?? attrsA['createdAt'] ?? DateTime.now().toIso8601String(),
+                );
+                DateTime dateB = DateTime.parse(
+                  attrsB['date'] ?? attrsB['createdAt'] ?? DateTime.now().toIso8601String(),
+                );
+                return dateB.compareTo(dateA); // Mới nhất lên trên
+              } catch (e) {
+                debugPrint('❌ Lỗi sort: $e');
+                return 0;
+              }
             });
           _giaoDichHienThi = _toanBoGiaoDich;
           _dangTai = false; // Tắt vòng xoay
         });
       } else {
-        // 3. THÊM ELSE ĐỂ BẮT LỖI SILENT
         debugPrint(
           "Lỗi Strapi từ chối: ${response.statusCode} - ${response.body}",
         );
-        setState(() => _dangTai = false); // Bị lỗi cũng phải tắt vòng xoay
+        setState(() => _dangTai = false);
       }
     } catch (e) {
       debugPrint("Lỗi mạng: $e");
@@ -81,8 +157,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         _giaoDichHienThi = _toanBoGiaoDich;
       } else {
         _giaoDichHienThi = _toanBoGiaoDich.where((gd) {
-          final ghiChu = (gd['note'] ?? '').toLowerCase();
-          final danhMuc = (gd['category']?['Name'] ?? '').toLowerCase();
+          final attrs = gd['attributes'] ?? gd;
+          final ghiChu = (attrs['note'] ?? '').toLowerCase();
+          // Lấy tên danh mục từ nested object
+          var catObj = attrs['category']?['data'];
+          String danhMuc = 'Khác';
+          if (catObj != null) {
+            danhMuc = (catObj['attributes']?['Name'] ?? catObj['Name'] ?? 'Khác').toLowerCase();
+          }
           return ghiChu.contains(tuKhoa.toLowerCase()) ||
               danhMuc.contains(tuKhoa.toLowerCase());
         }).toList();
@@ -90,14 +172,29 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     });
   }
 
+  // HELPER: Lấy giá trị từ nested Strapi object
+  String _layNgayTuGiaoDich(dynamic gd) {
+    final attrs = gd['attributes'] ?? gd;
+    final dateStr = attrs['date'] ?? attrs['createdAt'];
+    if (dateStr == null) return '';
+    try {
+      DateTime dt = DateTime.parse(dateStr).toLocal();
+      return DateFormat('dd/MM/yyyy').format(dt);
+    } catch (e) {
+      debugPrint('❌ Lỗi parse date: $dateStr - $e');
+      return '';
+    }
+  }
+
   // THUẬT TOÁN GOM NHÓM THEO NGÀY
   Map<String, List<dynamic>> _gomNhomTheoNgay(List data) {
     Map<String, List<dynamic>> danhSachDaGom = {};
     for (var gd in data) {
-      if (gd['date'] == null) continue;
-      DateTime dt = DateTime.parse(gd['date']).toLocal();
-      // Format ngày làm chìa khóa (Key) ví dụ: "14/03/2026"
-      String ngayKey = DateFormat('dd/MM/yyyy').format(dt);
+      String ngayKey = _layNgayTuGiaoDich(gd);
+      if (ngayKey.isEmpty) {
+        debugPrint('⚠️ Bỏ qua giao dịch không có ngày: ${gd['id']}');
+        continue;
+      }
 
       if (!danhSachDaGom.containsKey(ngayKey)) {
         danhSachDaGom[ngayKey] = [];
@@ -152,10 +249,39 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             child: _dangTai
                 ? const Center(child: CircularProgressIndicator())
                 : duLieuDaGom.isEmpty
-                ? const Center(
-                    child: Text(
-                      "Không tìm thấy giao dịch nào!",
-                      style: TextStyle(color: Colors.grey),
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.inbox_rounded,
+                          size: 80,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Chưa có giao dịch nào",
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Hãy thêm chi tiêu của bạn",
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _layDuLieuTuStrapi,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text("Tải lại"),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
@@ -170,7 +296,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       // Tính tổng tiền của ngày đó
                       double tongTienNgay = giaoDichTrongNgay.fold(
                         0.0,
-                        (tong, gd) => tong + (gd['amount'] ?? 0).toDouble(),
+                        (tong, gd) {
+                          final attrs = gd['attributes'] ?? gd;
+                          return tong + ((attrs['amount'] ?? 0) as num).toDouble();
+                        },
                       );
                       String formatTongTien = NumberFormat.currency(
                         locale: 'vi_VN',
@@ -268,10 +397,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                             ), // Cho thanh kẻ ngang tàng hình luôn cho mượt
                             // DANH SÁCH CÁC MÓN TIÊU TRONG NGÀY
                             ...giaoDichTrongNgay.map((gd) {
-                              final soTien = gd['amount'] ?? 0;
-                              final ghiChu = gd['note'] ?? 'Chưa có ghi chú';
-                              final tenDanhMuc =
-                                  gd['category']?['Name'] ?? 'Khác';
+                              final attrs = gd['attributes'] ?? gd;
+                              final soTien = (attrs['amount'] ?? 0).toDouble();
+                              final ghiChu = attrs['note'] ?? 'Chưa có ghi chú';
+                              
+                              // Lấy tên danh mục từ nested object (Strapi v5 format)
+                              String tenDanhMuc = 'Khác';
+                              var catObj = attrs['category']?['data'];
+                              if (catObj != null) {
+                                tenDanhMuc = catObj['attributes']?['Name'] ?? catObj['Name'] ?? 'Khác';
+                              }
+                              
                               final formatTien = NumberFormat.currency(
                                 locale: 'vi_VN',
                                 symbol: '',
@@ -280,10 +416,10 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               return ListTile(
                                 leading: CircleAvatar(
                                   radius: 20,
-                                  backgroundColor: Colors.teal.shade50,
-                                  child: const Icon(
-                                    Icons.monetization_on,
-                                    color: Colors.teal,
+                                  backgroundColor: _layMauDanhMuc(tenDanhMuc).withValues(alpha: 0.15),
+                                  child: Icon(
+                                    _layIconDanhMuc(tenDanhMuc),
+                                    color: _layMauDanhMuc(tenDanhMuc),
                                     size: 20,
                                   ),
                                 ),
@@ -293,6 +429,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                                     fontSize: 15,
                                     fontWeight: FontWeight.w500,
                                   ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 subtitle: Text(
                                   tenDanhMuc,
@@ -302,7 +440,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                                   ),
                                 ),
                                 trailing: Text(
-                                  formatTien,
+                                  '${formatTien} đ',
                                   style: const TextStyle(
                                     color: Colors.redAccent,
                                     fontWeight: FontWeight.bold,
