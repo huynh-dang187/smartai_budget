@@ -182,20 +182,24 @@ class _BudgetScreenState extends State<BudgetScreen> {
         // 🔒 FILTER: Try multiple paths to find user
         final List giaoDich = allTransactions.where((t) {
           int? userId;
-          
+
           // Path 1: Direct user.id
           if (t['user'] is Map && t['user']['id'] != null) {
             userId = t['user']['id'];
           }
           // Path 2: Nested user.data.id
-          else if (t['user'] is Map && t['user']['data'] is Map && t['user']['data']['id'] != null) {
+          else if (t['user'] is Map &&
+              t['user']['data'] is Map &&
+              t['user']['data']['id'] != null) {
             userId = t['user']['data']['id'];
           }
           // Path 3: Via attributes
           else if (t['attributes'] is Map && t['attributes']['user'] is Map) {
-            userId = t['attributes']['user']['data']?['id'] ?? t['attributes']['user']['id'];
+            userId =
+                t['attributes']['user']['data']?['id'] ??
+                t['attributes']['user']['id'];
           }
-          
+
           if (userId == null) return false;
           return userId == myId;
         }).toList();

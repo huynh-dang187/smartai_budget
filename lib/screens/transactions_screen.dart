@@ -27,12 +27,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   // Lấy icon danh mục dựa trên tên
   IconData _layIconDanhMuc(String tenDanhMuc) {
     final ten = tenDanhMuc.toLowerCase();
-    if (ten.contains('ăn') || ten.contains('uống')) return Icons.fastfood_rounded;
+    if (ten.contains('ăn') || ten.contains('uống'))
+      return Icons.fastfood_rounded;
     if (ten.contains('đi')) return Icons.directions_car_rounded;
     if (ten.contains('học')) return Icons.school_rounded;
     if (ten.contains('giải trí')) return Icons.sports_esports_rounded;
     if (ten.contains('nhà') || ten.contains('trọ')) return Icons.home_rounded;
-    if (ten.contains('sức khỏe') || ten.contains('y tế')) return Icons.health_and_safety_rounded;
+    if (ten.contains('sức khỏe') || ten.contains('y tế'))
+      return Icons.health_and_safety_rounded;
     if (ten.contains('quần áo')) return Icons.shopping_bag_rounded;
     return Icons.receipt_long_rounded;
   }
@@ -76,7 +78,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         final data = json.decode(response.body);
         List allTransactions = data['data'] ?? [];
 
-        debugPrint('\n🔍 [TX_SCREEN] Got ${allTransactions.length} transactions');
+        debugPrint(
+          '\n🔍 [TX_SCREEN] Got ${allTransactions.length} transactions',
+        );
         if (allTransactions.isNotEmpty) {
           var first = allTransactions[0];
           debugPrint('First TX keys: ${first.keys.toList()}');
@@ -87,14 +91,16 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         // Try multiple paths to find user ID
         final List giaoDichLocRoi = allTransactions.where((t) {
           int? userId;
-          
+
           // Path 1: Direct user.id (from POST response format)
           if (t['user'] is Map && t['user']['id'] != null) {
             userId = t['user']['id'];
             debugPrint('TX ${t['id']}: Path 1 (user.id) -> $userId');
           }
           // Path 2: Nested user.data.id
-          else if (t['user'] is Map && t['user']['data'] is Map && t['user']['data']['id'] != null) {
+          else if (t['user'] is Map &&
+              t['user']['data'] is Map &&
+              t['user']['data']['id'] != null) {
             userId = t['user']['data']['id'];
             debugPrint('TX ${t['id']}: Path 2 (user.data.id) -> $userId');
           }
@@ -104,18 +110,20 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             userId = userObj['data']?['id'] ?? userObj['id'];
             debugPrint('TX ${t['id']}: Path 3 (attributes.user) -> $userId');
           }
-          
+
           if (userId == null) {
             debugPrint('TX ${t['id']}: ❌ NO USER FOUND');
             return false;
           }
-          
+
           bool match = userId == myId;
           debugPrint('TX ${t['id']}: $userId == $myId ? $match');
           return match;
         }).toList();
-        
-        debugPrint("📊 After filter: ${giaoDichLocRoi.length}/${allTransactions.length} for user $myId\n");
+
+        debugPrint(
+          "📊 After filter: ${giaoDichLocRoi.length}/${allTransactions.length} for user $myId\n",
+        );
 
         setState(() {
           _toanBoGiaoDich = giaoDichLocRoi
@@ -124,10 +132,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 final attrsA = a['attributes'] ?? a;
                 final attrsB = b['attributes'] ?? b;
                 DateTime dateA = DateTime.parse(
-                  attrsA['date'] ?? attrsA['createdAt'] ?? DateTime.now().toIso8601String(),
+                  attrsA['date'] ??
+                      attrsA['createdAt'] ??
+                      DateTime.now().toIso8601String(),
                 );
                 DateTime dateB = DateTime.parse(
-                  attrsB['date'] ?? attrsB['createdAt'] ?? DateTime.now().toIso8601String(),
+                  attrsB['date'] ??
+                      attrsB['createdAt'] ??
+                      DateTime.now().toIso8601String(),
                 );
                 return dateB.compareTo(dateA); // Mới nhất lên trên
               } catch (e) {
@@ -163,7 +175,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           var catObj = attrs['category']?['data'];
           String danhMuc = 'Khác';
           if (catObj != null) {
-            danhMuc = (catObj['attributes']?['Name'] ?? catObj['Name'] ?? 'Khác').toLowerCase();
+            danhMuc =
+                (catObj['attributes']?['Name'] ?? catObj['Name'] ?? 'Khác')
+                    .toLowerCase();
           }
           return ghiChu.contains(tuKhoa.toLowerCase()) ||
               danhMuc.contains(tuKhoa.toLowerCase());
@@ -294,13 +308,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                       List giaoDichTrongNgay = duLieuDaGom[ngay]!;
 
                       // Tính tổng tiền của ngày đó
-                      double tongTienNgay = giaoDichTrongNgay.fold(
-                        0.0,
-                        (tong, gd) {
-                          final attrs = gd['attributes'] ?? gd;
-                          return tong + ((attrs['amount'] ?? 0) as num).toDouble();
-                        },
-                      );
+                      double tongTienNgay = giaoDichTrongNgay.fold(0.0, (
+                        tong,
+                        gd,
+                      ) {
+                        final attrs = gd['attributes'] ?? gd;
+                        return tong +
+                            ((attrs['amount'] ?? 0) as num).toDouble();
+                      });
                       String formatTongTien = NumberFormat.currency(
                         locale: 'vi_VN',
                         symbol: 'đ',
@@ -400,14 +415,17 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               final attrs = gd['attributes'] ?? gd;
                               final soTien = (attrs['amount'] ?? 0).toDouble();
                               final ghiChu = attrs['note'] ?? 'Chưa có ghi chú';
-                              
+
                               // Lấy tên danh mục từ nested object (Strapi v5 format)
                               String tenDanhMuc = 'Khác';
                               var catObj = attrs['category']?['data'];
                               if (catObj != null) {
-                                tenDanhMuc = catObj['attributes']?['Name'] ?? catObj['Name'] ?? 'Khác';
+                                tenDanhMuc =
+                                    catObj['attributes']?['Name'] ??
+                                    catObj['Name'] ??
+                                    'Khác';
                               }
-                              
+
                               final formatTien = NumberFormat.currency(
                                 locale: 'vi_VN',
                                 symbol: '',
@@ -416,7 +434,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               return ListTile(
                                 leading: CircleAvatar(
                                   radius: 20,
-                                  backgroundColor: _layMauDanhMuc(tenDanhMuc).withValues(alpha: 0.15),
+                                  backgroundColor: _layMauDanhMuc(
+                                    tenDanhMuc,
+                                  ).withValues(alpha: 0.15),
                                   child: Icon(
                                     _layIconDanhMuc(tenDanhMuc),
                                     color: _layMauDanhMuc(tenDanhMuc),

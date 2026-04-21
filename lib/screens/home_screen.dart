@@ -133,35 +133,43 @@ class HomeScreenState extends State<HomeScreen> {
 
         // � FILTER TO USER'S OWN DATA ONLY
         final List allTransactions = data['data'] ?? [];
-        debugPrint('\n📋 [HOME] Got ${allTransactions.length} from API, myId=$myId');
-        
+        debugPrint(
+          '\n📋 [HOME] Got ${allTransactions.length} from API, myId=$myId',
+        );
+
         if (allTransactions.isNotEmpty) {
           var first = allTransactions[0];
           debugPrint('First TX: id=${first['id']}, user=${first['user']}');
         }
-        
+
         final List giaoDich = allTransactions.where((t) {
           int? userId;
-          
-          // Path 1: Direct user.id 
+
+          // Path 1: Direct user.id
           if (t['user'] is Map && t['user']['id'] != null) {
             userId = t['user']['id'];
-          } 
+          }
           // Path 2: Nested user.data.id
-          else if (t['user'] is Map && t['user']['data'] is Map && t['user']['data']['id'] != null) {
+          else if (t['user'] is Map &&
+              t['user']['data'] is Map &&
+              t['user']['data']['id'] != null) {
             userId = t['user']['data']['id'];
           }
           // Path 3: Via attributes
           else if (t['attributes'] is Map && t['attributes']['user'] is Map) {
-            userId = t['attributes']['user']['data']?['id'] ?? t['attributes']['user']['id'];
+            userId =
+                t['attributes']['user']['data']?['id'] ??
+                t['attributes']['user']['id'];
           }
-          
+
           bool match = userId == myId;
           if (match) debugPrint('  ✓ TX ${t['id']}: $userId == $myId');
           return match;
         }).toList();
 
-        debugPrint("📊 Filtered: ${giaoDich.length}/${allTransactions.length}\n");
+        debugPrint(
+          "📊 Filtered: ${giaoDich.length}/${allTransactions.length}\n",
+        );
 
         if (mounted) {
           setState(() {
