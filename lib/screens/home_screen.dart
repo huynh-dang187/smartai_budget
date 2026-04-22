@@ -79,20 +79,65 @@ class HomeScreenState extends State<HomeScreen> {
           }
 
           if (codePoint == null || colorStr.isEmpty) {
-            if (tenKey.contains('ăn')) {
+            // Ăn/cơm/cà phê
+            if (tenKey.contains('ăn') || tenKey.contains('cơm') || 
+                tenKey.contains('cà phê') || tenKey.contains('cafe')) {
               iconData = Icons.fastfood_rounded;
               colorData = Colors.orange;
-            } else if (tenKey.contains('giải') || tenKey.contains('chơi')) {
+            }
+            // Wifi/điện/nước/xăng/gas
+            else if (tenKey.contains('wifi') || tenKey.contains('điện') ||
+                tenKey.contains('nước') || tenKey.contains('xăng') ||
+                tenKey.contains('gas')) {
+              iconData = Icons.bolt_rounded;
+              colorData = Colors.amber;
+            }
+            // Nhật/sinh/quà/kỷ niệm
+            else if (tenKey.contains('nhật') || tenKey.contains('sinh') ||
+                tenKey.contains('quà') || tenKey.contains('kỷ niệm')) {
+              iconData = Icons.cake_rounded;
+              colorData = Colors.pink;
+            }
+            // Y tế/sức khỏe/bệnh/thuốc
+            else if (tenKey.contains('y tế') || tenKey.contains('sức khỏe') ||
+                tenKey.contains('bệnh') || tenKey.contains('thuốc') ||
+                tenKey.contains('bs') || tenKey.contains('viện')) {
+              iconData = Icons.medical_services_rounded;
+              colorData = Colors.red;
+            }
+            // Giải/chơi/game/phim
+            else if (tenKey.contains('giải') || tenKey.contains('chơi') ||
+                tenKey.contains('game') || tenKey.contains('phim') ||
+                tenKey.contains('xem')) {
               iconData = Icons.sports_esports_rounded;
               colorData = Colors.purple;
-            } else if (tenKey.contains('học')) {
+            }
+            // Học/sách/lớp/nhạc
+            else if (tenKey.contains('học') || tenKey.contains('sách') ||
+                tenKey.contains('lớp') || tenKey.contains('nhạc') ||
+                tenKey.contains('course')) {
               iconData = Icons.school_rounded;
               colorData = Colors.blue;
-            } else if (tenKey.contains('nhà') ||
-                tenKey.contains('trọ') ||
-                tenKey.contains('wifi')) {
+            }
+            // Nhà/trọ/phòng
+            else if (tenKey.contains('nhà') || tenKey.contains('trọ') ||
+                tenKey.contains('phòng') || tenKey.contains('thuê')) {
               iconData = Icons.home_rounded;
               colorData = Colors.teal;
+            }
+            // Mua/sắm/quần áo/đồ
+            else if (tenKey.contains('mua') || tenKey.contains('sắm') ||
+                tenKey.contains('quần áo') || tenKey.contains('shopping') ||
+                tenKey.contains('áo') || tenKey.contains('giày')) {
+              iconData = Icons.shopping_bag_rounded;
+              colorData = Colors.indigo;
+            }
+            // Xe/taxi/tàu
+            else if (tenKey.contains('xe') || tenKey.contains('taxi') ||
+                tenKey.contains('tàu') || tenKey.contains('bus') ||
+                tenKey.contains('grab')) {
+              iconData = Icons.directions_car_rounded;
+              colorData = Colors.cyan;
             }
           }
           _tuDienGiaoDien[tenKey] = {'icon': iconData, 'color': colorData};
