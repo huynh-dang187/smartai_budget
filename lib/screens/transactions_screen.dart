@@ -257,7 +257,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   String _getTenDanhMucTuGiaoDich(dynamic gd) {
     final attrs = gd['attributes'] ?? gd;
     var catObj = attrs['category'];
-    
+
     if (catObj != null) {
       // Path 1: Direct Name field
       if (catObj is Map && catObj['Name'] != null) {
@@ -287,7 +287,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   void _locGiaoDich(String tuKhoa) {
     setState(() {
       List filtered = _toanBoGiaoDich;
-      
+
       // Filter theo search keyword
       if (tuKhoa.isNotEmpty) {
         filtered = filtered.where((gd) {
@@ -298,7 +298,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               danhMuc.contains(tuKhoa.toLowerCase());
         }).toList();
       }
-      
+
       // Filter theo selected categories (nếu có chọn)
       if (_categoriesSelected.isNotEmpty) {
         filtered = filtered.where((gd) {
@@ -306,7 +306,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           return _categoriesSelected.contains(tenDM);
         }).toList();
       }
-      
+
       _giaoDichHienThi = filtered;
     });
   }
@@ -416,11 +416,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                     ),
                   ),
                   // Category chips
-                  ..._getUniqueCategoriesFromList(_toanBoGiaoDich)
-                      .toList()
-                      .asMap()
-                      .entries
-                      .map((entry) {
+                  ..._getUniqueCategoriesFromList(
+                    _toanBoGiaoDich,
+                  ).toList().asMap().entries.map((entry) {
                     String category = entry.value;
                     bool isSelected = _categoriesSelected.contains(category);
                     IconData icon = _layIconDanhMuc(category);
