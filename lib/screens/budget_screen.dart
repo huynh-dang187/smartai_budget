@@ -129,13 +129,103 @@ class _BudgetScreenState extends State<BudgetScreen> {
           danhSachNganSach = dmTam;
         });
       } else {
-        // 🚨 NẾU API TỪ CHỐI (VÍ DỤ LỖI 403), TẮT VÒNG XOAY NGAY
-        debugPrint("Lỗi tải danh mục API: ${response.statusCode}");
+        // 🚨 API FAILED - TRY FALLBACK
+        debugPrint("❌ Lỗi tải danh mục API: ${response.statusCode}, dùng fallback từ transactions");
+        await _extractCategoriesFromTransactionsData();
+      }
+    } catch (e) {
+      // 🚨 BẮT LỖI MẠNG - TRY FALLBACK
+      debugPrint("❌ Lỗi tải danh mục: $e, dùng fallback từ transactions");
+      await _extractCategoriesFromTransactionsData();
+    }
+  }
+
+  // FALLBACK: EXTRACT CATEGORIES TỪ TRANSACTION DATA
+  Future<void> _extractCategoriesFromTransactionsData() async {
+    int? myId = userIdGlobal.value;
+    final url = Uri.parse(
+      'http://139.59.242.7:1337/api/transactions?populate=category&populate=user',
+    );
+    try {
+      String? token =
+          _prefs.getString('jwt_token') ?? _prefs.getString('token');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        List allTransactions = data['data'] ?? [];
+
+        // EXTRACT UNIQUE CATEGORIES TỪ TRANSACTIONS
+        Set<String> uniqueCategories = {};
+        for (var gd in allTransactions) {
+          final attrs = gd['attributes'] ?? gd;
+          if (attrs['category'] != null) {
+            var cat = attrs['category'];
+            String tenDM = 'Khác';
+            if (cat['Name'] != null) {
+              tenDM = cat['Name'];
+            } else if (cat['data'] != null) {
+              tenDM =
+                  (cat['data']['attributes'] ?? cat['data'])['Name'] ??
+                  'Khác';
+            }
+            uniqueCategories.add(tenDM);
+          }
+        }
+
+        debugPrint(
+          "📊 Fallback: extracted ${uniqueCategories.length} categories from transactions",
+        );
+
+        List<Map<String, dynamic>> dmTam = [];
+        for (var tenDM in uniqueCategories) {
+          IconData icon = Icons.category_rounded;
+          Color mau = Colors.blueGrey;
+
+          // Auto-assign icons based on name
+          String tenToLowerCase = tenDM.toLowerCase();
+          if (tenToLowerCase.contains('ăn')) {
+            icon = Icons.fastfood_rounded;
+            mau = Colors.orange;
+          } else if (tenToLowerCase.contains('giải') ||
+              tenToLowerCase.contains('chơi')) {
+            icon = Icons.sports_esports_rounded;
+            mau = Colors.purple;
+          } else if (tenToLowerCase.contains('học')) {
+            icon = Icons.school_rounded;
+            mau = Colors.blue;
+          } else if (tenToLowerCase.contains('nhà') ||
+              tenToLowerCase.contains('trọ')) {
+            icon = Icons.home_rounded;
+            mau = Colors.teal;
+          }
+
+          dmTam.add({
+            "ten": tenDM,
+            "daTieu": 0.0,
+            "hanMuc": 1000000.0,
+            "icon": icon,
+            "mauIcon": mau,
+          });
+        }
+
+        setState(() {
+          danhSachNganSach = dmTam;
+        });
+        debugPrint("✅ Fallback categories loaded successfully");
+      } else {
+        debugPrint("❌ Fallback also failed: ${response.statusCode}");
         setState(() => _dangTai = false);
       }
     } catch (e) {
-      // 🚨 BẮT LỖI MẠNG ĐỂ KHÔNG BỊ XOAY MÃI
-      debugPrint("Lỗi tải danh mục: $e");
+      debugPrint("❌ Fallback error: $e");
       setState(() => _dangTai = false);
     }
   }
