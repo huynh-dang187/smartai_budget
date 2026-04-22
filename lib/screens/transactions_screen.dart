@@ -27,28 +27,78 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   // Lấy icon danh mục dựa trên tên
   IconData _layIconDanhMuc(String tenDanhMuc) {
     final ten = tenDanhMuc.toLowerCase();
-    if (ten.contains('ăn') || ten.contains('uống'))
+    if (ten.contains('ăn') || ten.contains('cơm') ||
+        ten.contains('cà phê') || ten.contains('cafe'))
       return Icons.fastfood_rounded;
-    if (ten.contains('đi')) return Icons.directions_car_rounded;
-    if (ten.contains('học')) return Icons.school_rounded;
-    if (ten.contains('giải trí')) return Icons.sports_esports_rounded;
-    if (ten.contains('nhà') || ten.contains('trọ')) return Icons.home_rounded;
-    if (ten.contains('sức khỏe') || ten.contains('y tế'))
-      return Icons.health_and_safety_rounded;
-    if (ten.contains('quần áo')) return Icons.shopping_bag_rounded;
+    if (ten.contains('wifi') || ten.contains('điện') ||
+        ten.contains('nước') || ten.contains('xăng') ||
+        ten.contains('gas'))
+      return Icons.bolt_rounded;
+    if (ten.contains('nhật') || ten.contains('sinh') ||
+        ten.contains('quà') || ten.contains('kỷ niệm'))
+      return Icons.cake_rounded;
+    if (ten.contains('y tế') || ten.contains('sức khỏe') ||
+        ten.contains('bệnh') || ten.contains('thuốc') ||
+        ten.contains('bs') || ten.contains('viện'))
+      return Icons.medical_services_rounded;
+    if (ten.contains('giải') || ten.contains('chơi') ||
+        ten.contains('game') || ten.contains('phim') ||
+        ten.contains('xem'))
+      return Icons.sports_esports_rounded;
+    if (ten.contains('học') || ten.contains('sách') ||
+        ten.contains('lớp') || ten.contains('nhạc') ||
+        ten.contains('course'))
+      return Icons.school_rounded;
+    if (ten.contains('nhà') || ten.contains('trọ') ||
+        ten.contains('phòng') || ten.contains('thuê'))
+      return Icons.home_rounded;
+    if (ten.contains('mua') || ten.contains('sắm') ||
+        ten.contains('quần áo') || ten.contains('shopping') ||
+        ten.contains('áo') || ten.contains('giày'))
+      return Icons.shopping_bag_rounded;
+    if (ten.contains('xe') || ten.contains('taxi') ||
+        ten.contains('tàu') || ten.contains('bus') ||
+        ten.contains('grab'))
+      return Icons.directions_car_rounded;
     return Icons.receipt_long_rounded;
   }
 
   // Lấy màu danh mục
   Color _layMauDanhMuc(String tenDanhMuc) {
     final ten = tenDanhMuc.toLowerCase();
-    if (ten.contains('ăn') || ten.contains('uống')) return Colors.orange;
-    if (ten.contains('đi')) return Colors.blue;
-    if (ten.contains('học')) return Colors.purple;
-    if (ten.contains('giải trí')) return Colors.pink;
-    if (ten.contains('nhà') || ten.contains('trọ')) return Colors.teal;
-    if (ten.contains('sức khỏe') || ten.contains('y tế')) return Colors.green;
-    if (ten.contains('quần áo')) return Colors.indigo;
+    if (ten.contains('ăn') || ten.contains('cơm') ||
+        ten.contains('cà phê') || ten.contains('cafe'))
+      return Colors.orange;
+    if (ten.contains('wifi') || ten.contains('điện') ||
+        ten.contains('nước') || ten.contains('xăng') ||
+        ten.contains('gas'))
+      return Colors.amber;
+    if (ten.contains('nhật') || ten.contains('sinh') ||
+        ten.contains('quà') || ten.contains('kỷ niệm'))
+      return Colors.pink;
+    if (ten.contains('y tế') || ten.contains('sức khỏe') ||
+        ten.contains('bệnh') || ten.contains('thuốc') ||
+        ten.contains('bs') || ten.contains('viện'))
+      return Colors.red;
+    if (ten.contains('giải') || ten.contains('chơi') ||
+        ten.contains('game') || ten.contains('phim') ||
+        ten.contains('xem'))
+      return Colors.purple;
+    if (ten.contains('học') || ten.contains('sách') ||
+        ten.contains('lớp') || ten.contains('nhạc') ||
+        ten.contains('course'))
+      return Colors.blue;
+    if (ten.contains('nhà') || ten.contains('trọ') ||
+        ten.contains('phòng') || ten.contains('thuê'))
+      return Colors.teal;
+    if (ten.contains('mua') || ten.contains('sắm') ||
+        ten.contains('quần áo') || ten.contains('shopping') ||
+        ten.contains('áo') || ten.contains('giày'))
+      return Colors.indigo;
+    if (ten.contains('xe') || ten.contains('taxi') ||
+        ten.contains('tàu') || ten.contains('bus') ||
+        ten.contains('grab'))
+      return Colors.cyan;
     return Colors.grey;
   }
 
