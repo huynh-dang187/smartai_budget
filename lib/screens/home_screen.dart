@@ -753,6 +753,66 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // --- HÀM LẤY ICON VÀ MÀU CHO DANH MỤC (SỬ DỤNG KEYWORD MATCHING) ---
+  Map<String, dynamic> _layIconVaMau(String tenDanhMuc) {
+    String tenKey = tenDanhMuc.toLowerCase().trim();
+
+    // 1. Kiểm tra từ điển trước
+    if (_tuDienGiaoDien.containsKey(tenKey)) {
+      return _tuDienGiaoDien[tenKey]!;
+    }
+
+    // 2. Fallback: Áp dụng keyword matching
+    IconData icon = Icons.receipt_long;
+    Color mau = Colors.teal;
+
+    if (tenKey.contains('ăn') || tenKey.contains('cơm') ||
+        tenKey.contains('cà phê') || tenKey.contains('cafe')) {
+      icon = Icons.fastfood_rounded;
+      mau = Colors.orange;
+    } else if (tenKey.contains('wifi') || tenKey.contains('điện') ||
+        tenKey.contains('nước') || tenKey.contains('xăng') ||
+        tenKey.contains('gas')) {
+      icon = Icons.bolt_rounded;
+      mau = Colors.amber;
+    } else if (tenKey.contains('nhật') || tenKey.contains('sinh') ||
+        tenKey.contains('quà') || tenKey.contains('kỷ niệm')) {
+      icon = Icons.cake_rounded;
+      mau = Colors.pink;
+    } else if (tenKey.contains('y tế') || tenKey.contains('sức khỏe') ||
+        tenKey.contains('bệnh') || tenKey.contains('thuốc') ||
+        tenKey.contains('bs') || tenKey.contains('viện')) {
+      icon = Icons.medical_services_rounded;
+      mau = Colors.red;
+    } else if (tenKey.contains('giải') || tenKey.contains('chơi') ||
+        tenKey.contains('game') || tenKey.contains('phim') ||
+        tenKey.contains('xem')) {
+      icon = Icons.sports_esports_rounded;
+      mau = Colors.purple;
+    } else if (tenKey.contains('học') || tenKey.contains('sách') ||
+        tenKey.contains('lớp') || tenKey.contains('nhạc') ||
+        tenKey.contains('course')) {
+      icon = Icons.school_rounded;
+      mau = Colors.blue;
+    } else if (tenKey.contains('nhà') || tenKey.contains('trọ') ||
+        tenKey.contains('phòng') || tenKey.contains('thuê')) {
+      icon = Icons.home_rounded;
+      mau = Colors.teal;
+    } else if (tenKey.contains('mua') || tenKey.contains('sắm') ||
+        tenKey.contains('quần áo') || tenKey.contains('shopping') ||
+        tenKey.contains('áo') || tenKey.contains('giày')) {
+      icon = Icons.shopping_bag_rounded;
+      mau = Colors.indigo;
+    } else if (tenKey.contains('xe') || tenKey.contains('taxi') ||
+        tenKey.contains('tàu') || tenKey.contains('bus') ||
+        tenKey.contains('grab')) {
+      icon = Icons.directions_car_rounded;
+      mau = Colors.cyan;
+    }
+
+    return {'icon': icon, 'color': mau};
+  }
+
   // --- HÀM XÂY CỬA THOÁT HIỂM: FORM NHẬP TAY ---
   Future<void> _moFormNhapTay() async {
     // 1. Hiện loading đi lấy danh mục
@@ -1184,13 +1244,10 @@ class HomeScreenState extends State<HomeScreen> {
                         symbol: 'đ',
                       ).format(soTien);
 
-                      // --- TRA TỪ ĐIỂN LẤY ICON VÀ MÀU ---
-                      final tenKey = tenDanhMuc.toLowerCase().trim();
-                      final iconChuan =
-                          _tuDienGiaoDien[tenKey]?['icon'] ??
-                          Icons.receipt_long;
-                      final mauChuan =
-                          _tuDienGiaoDien[tenKey]?['color'] ?? Colors.teal;
+                      // --- LẤY ICON VÀ MÀU BẰNG HELPER FUNCTION ---
+                      final iconMauData = _layIconVaMau(tenDanhMuc);
+                      final iconChuan = iconMauData['icon'] ?? Icons.receipt_long;
+                      final mauChuan = iconMauData['color'] ?? Colors.teal;
 
                       return InkWell(
                         borderRadius: BorderRadius.circular(12),
