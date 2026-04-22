@@ -80,61 +80,81 @@ class HomeScreenState extends State<HomeScreen> {
 
           if (codePoint == null || colorStr.isEmpty) {
             // Ăn/cơm/cà phê
-            if (tenKey.contains('ăn') || tenKey.contains('cơm') || 
-                tenKey.contains('cà phê') || tenKey.contains('cafe')) {
+            if (tenKey.contains('ăn') ||
+                tenKey.contains('cơm') ||
+                tenKey.contains('cà phê') ||
+                tenKey.contains('cafe')) {
               iconData = Icons.fastfood_rounded;
               colorData = Colors.orange;
             }
             // Wifi/điện/nước/xăng/gas
-            else if (tenKey.contains('wifi') || tenKey.contains('điện') ||
-                tenKey.contains('nước') || tenKey.contains('xăng') ||
+            else if (tenKey.contains('wifi') ||
+                tenKey.contains('điện') ||
+                tenKey.contains('nước') ||
+                tenKey.contains('xăng') ||
                 tenKey.contains('gas')) {
               iconData = Icons.bolt_rounded;
               colorData = Colors.amber;
             }
             // Nhật/sinh/quà/kỷ niệm
-            else if (tenKey.contains('nhật') || tenKey.contains('sinh') ||
-                tenKey.contains('quà') || tenKey.contains('kỷ niệm')) {
+            else if (tenKey.contains('nhật') ||
+                tenKey.contains('sinh') ||
+                tenKey.contains('quà') ||
+                tenKey.contains('kỷ niệm')) {
               iconData = Icons.cake_rounded;
               colorData = Colors.pink;
             }
             // Y tế/sức khỏe/bệnh/thuốc
-            else if (tenKey.contains('y tế') || tenKey.contains('sức khỏe') ||
-                tenKey.contains('bệnh') || tenKey.contains('thuốc') ||
-                tenKey.contains('bs') || tenKey.contains('viện')) {
+            else if (tenKey.contains('y tế') ||
+                tenKey.contains('sức khỏe') ||
+                tenKey.contains('bệnh') ||
+                tenKey.contains('thuốc') ||
+                tenKey.contains('bs') ||
+                tenKey.contains('viện')) {
               iconData = Icons.medical_services_rounded;
               colorData = Colors.red;
             }
             // Giải/chơi/game/phim
-            else if (tenKey.contains('giải') || tenKey.contains('chơi') ||
-                tenKey.contains('game') || tenKey.contains('phim') ||
+            else if (tenKey.contains('giải') ||
+                tenKey.contains('chơi') ||
+                tenKey.contains('game') ||
+                tenKey.contains('phim') ||
                 tenKey.contains('xem')) {
               iconData = Icons.sports_esports_rounded;
               colorData = Colors.purple;
             }
             // Học/sách/lớp/nhạc
-            else if (tenKey.contains('học') || tenKey.contains('sách') ||
-                tenKey.contains('lớp') || tenKey.contains('nhạc') ||
+            else if (tenKey.contains('học') ||
+                tenKey.contains('sách') ||
+                tenKey.contains('lớp') ||
+                tenKey.contains('nhạc') ||
                 tenKey.contains('course')) {
               iconData = Icons.school_rounded;
               colorData = Colors.blue;
             }
             // Nhà/trọ/phòng
-            else if (tenKey.contains('nhà') || tenKey.contains('trọ') ||
-                tenKey.contains('phòng') || tenKey.contains('thuê')) {
+            else if (tenKey.contains('nhà') ||
+                tenKey.contains('trọ') ||
+                tenKey.contains('phòng') ||
+                tenKey.contains('thuê')) {
               iconData = Icons.home_rounded;
               colorData = Colors.teal;
             }
             // Mua/sắm/quần áo/đồ
-            else if (tenKey.contains('mua') || tenKey.contains('sắm') ||
-                tenKey.contains('quần áo') || tenKey.contains('shopping') ||
-                tenKey.contains('áo') || tenKey.contains('giày')) {
+            else if (tenKey.contains('mua') ||
+                tenKey.contains('sắm') ||
+                tenKey.contains('quần áo') ||
+                tenKey.contains('shopping') ||
+                tenKey.contains('áo') ||
+                tenKey.contains('giày')) {
               iconData = Icons.shopping_bag_rounded;
               colorData = Colors.indigo;
             }
             // Xe/taxi/tàu
-            else if (tenKey.contains('xe') || tenKey.contains('taxi') ||
-                tenKey.contains('tàu') || tenKey.contains('bus') ||
+            else if (tenKey.contains('xe') ||
+                tenKey.contains('taxi') ||
+                tenKey.contains('tàu') ||
+                tenKey.contains('bus') ||
                 tenKey.contains('grab')) {
               iconData = Icons.directions_car_rounded;
               colorData = Colors.cyan;
@@ -766,45 +786,65 @@ class HomeScreenState extends State<HomeScreen> {
     IconData icon = Icons.receipt_long;
     Color mau = Colors.teal;
 
-    if (tenKey.contains('ăn') || tenKey.contains('cơm') ||
-        tenKey.contains('cà phê') || tenKey.contains('cafe')) {
+    if (tenKey.contains('ăn') ||
+        tenKey.contains('cơm') ||
+        tenKey.contains('cà phê') ||
+        tenKey.contains('cafe')) {
       icon = Icons.fastfood_rounded;
       mau = Colors.orange;
-    } else if (tenKey.contains('wifi') || tenKey.contains('điện') ||
-        tenKey.contains('nước') || tenKey.contains('xăng') ||
+    } else if (tenKey.contains('wifi') ||
+        tenKey.contains('điện') ||
+        tenKey.contains('nước') ||
+        tenKey.contains('xăng') ||
         tenKey.contains('gas')) {
       icon = Icons.bolt_rounded;
       mau = Colors.amber;
-    } else if (tenKey.contains('nhật') || tenKey.contains('sinh') ||
-        tenKey.contains('quà') || tenKey.contains('kỷ niệm')) {
+    } else if (tenKey.contains('nhật') ||
+        tenKey.contains('sinh') ||
+        tenKey.contains('quà') ||
+        tenKey.contains('kỷ niệm')) {
       icon = Icons.cake_rounded;
       mau = Colors.pink;
-    } else if (tenKey.contains('y tế') || tenKey.contains('sức khỏe') ||
-        tenKey.contains('bệnh') || tenKey.contains('thuốc') ||
-        tenKey.contains('bs') || tenKey.contains('viện')) {
+    } else if (tenKey.contains('y tế') ||
+        tenKey.contains('sức khỏe') ||
+        tenKey.contains('bệnh') ||
+        tenKey.contains('thuốc') ||
+        tenKey.contains('bs') ||
+        tenKey.contains('viện')) {
       icon = Icons.medical_services_rounded;
       mau = Colors.red;
-    } else if (tenKey.contains('giải') || tenKey.contains('chơi') ||
-        tenKey.contains('game') || tenKey.contains('phim') ||
+    } else if (tenKey.contains('giải') ||
+        tenKey.contains('chơi') ||
+        tenKey.contains('game') ||
+        tenKey.contains('phim') ||
         tenKey.contains('xem')) {
       icon = Icons.sports_esports_rounded;
       mau = Colors.purple;
-    } else if (tenKey.contains('học') || tenKey.contains('sách') ||
-        tenKey.contains('lớp') || tenKey.contains('nhạc') ||
+    } else if (tenKey.contains('học') ||
+        tenKey.contains('sách') ||
+        tenKey.contains('lớp') ||
+        tenKey.contains('nhạc') ||
         tenKey.contains('course')) {
       icon = Icons.school_rounded;
       mau = Colors.blue;
-    } else if (tenKey.contains('nhà') || tenKey.contains('trọ') ||
-        tenKey.contains('phòng') || tenKey.contains('thuê')) {
+    } else if (tenKey.contains('nhà') ||
+        tenKey.contains('trọ') ||
+        tenKey.contains('phòng') ||
+        tenKey.contains('thuê')) {
       icon = Icons.home_rounded;
       mau = Colors.teal;
-    } else if (tenKey.contains('mua') || tenKey.contains('sắm') ||
-        tenKey.contains('quần áo') || tenKey.contains('shopping') ||
-        tenKey.contains('áo') || tenKey.contains('giày')) {
+    } else if (tenKey.contains('mua') ||
+        tenKey.contains('sắm') ||
+        tenKey.contains('quần áo') ||
+        tenKey.contains('shopping') ||
+        tenKey.contains('áo') ||
+        tenKey.contains('giày')) {
       icon = Icons.shopping_bag_rounded;
       mau = Colors.indigo;
-    } else if (tenKey.contains('xe') || tenKey.contains('taxi') ||
-        tenKey.contains('tàu') || tenKey.contains('bus') ||
+    } else if (tenKey.contains('xe') ||
+        tenKey.contains('taxi') ||
+        tenKey.contains('tàu') ||
+        tenKey.contains('bus') ||
         tenKey.contains('grab')) {
       icon = Icons.directions_car_rounded;
       mau = Colors.cyan;
@@ -1246,7 +1286,8 @@ class HomeScreenState extends State<HomeScreen> {
 
                       // --- LẤY ICON VÀ MÀU BẰNG HELPER FUNCTION ---
                       final iconMauData = _layIconVaMau(tenDanhMuc);
-                      final iconChuan = iconMauData['icon'] ?? Icons.receipt_long;
+                      final iconChuan =
+                          iconMauData['icon'] ?? Icons.receipt_long;
                       final mauChuan = iconMauData['color'] ?? Colors.teal;
 
                       return InkWell(

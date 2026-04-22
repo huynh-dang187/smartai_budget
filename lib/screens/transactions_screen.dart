@@ -27,37 +27,57 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   // Lấy icon danh mục dựa trên tên
   IconData _layIconDanhMuc(String tenDanhMuc) {
     final ten = tenDanhMuc.toLowerCase();
-    if (ten.contains('ăn') || ten.contains('cơm') ||
-        ten.contains('cà phê') || ten.contains('cafe'))
+    if (ten.contains('ăn') ||
+        ten.contains('cơm') ||
+        ten.contains('cà phê') ||
+        ten.contains('cafe'))
       return Icons.fastfood_rounded;
-    if (ten.contains('wifi') || ten.contains('điện') ||
-        ten.contains('nước') || ten.contains('xăng') ||
+    if (ten.contains('wifi') ||
+        ten.contains('điện') ||
+        ten.contains('nước') ||
+        ten.contains('xăng') ||
         ten.contains('gas'))
       return Icons.bolt_rounded;
-    if (ten.contains('nhật') || ten.contains('sinh') ||
-        ten.contains('quà') || ten.contains('kỷ niệm'))
+    if (ten.contains('nhật') ||
+        ten.contains('sinh') ||
+        ten.contains('quà') ||
+        ten.contains('kỷ niệm'))
       return Icons.cake_rounded;
-    if (ten.contains('y tế') || ten.contains('sức khỏe') ||
-        ten.contains('bệnh') || ten.contains('thuốc') ||
-        ten.contains('bs') || ten.contains('viện'))
+    if (ten.contains('y tế') ||
+        ten.contains('sức khỏe') ||
+        ten.contains('bệnh') ||
+        ten.contains('thuốc') ||
+        ten.contains('bs') ||
+        ten.contains('viện'))
       return Icons.medical_services_rounded;
-    if (ten.contains('giải') || ten.contains('chơi') ||
-        ten.contains('game') || ten.contains('phim') ||
+    if (ten.contains('giải') ||
+        ten.contains('chơi') ||
+        ten.contains('game') ||
+        ten.contains('phim') ||
         ten.contains('xem'))
       return Icons.sports_esports_rounded;
-    if (ten.contains('học') || ten.contains('sách') ||
-        ten.contains('lớp') || ten.contains('nhạc') ||
+    if (ten.contains('học') ||
+        ten.contains('sách') ||
+        ten.contains('lớp') ||
+        ten.contains('nhạc') ||
         ten.contains('course'))
       return Icons.school_rounded;
-    if (ten.contains('nhà') || ten.contains('trọ') ||
-        ten.contains('phòng') || ten.contains('thuê'))
+    if (ten.contains('nhà') ||
+        ten.contains('trọ') ||
+        ten.contains('phòng') ||
+        ten.contains('thuê'))
       return Icons.home_rounded;
-    if (ten.contains('mua') || ten.contains('sắm') ||
-        ten.contains('quần áo') || ten.contains('shopping') ||
-        ten.contains('áo') || ten.contains('giày'))
+    if (ten.contains('mua') ||
+        ten.contains('sắm') ||
+        ten.contains('quần áo') ||
+        ten.contains('shopping') ||
+        ten.contains('áo') ||
+        ten.contains('giày'))
       return Icons.shopping_bag_rounded;
-    if (ten.contains('xe') || ten.contains('taxi') ||
-        ten.contains('tàu') || ten.contains('bus') ||
+    if (ten.contains('xe') ||
+        ten.contains('taxi') ||
+        ten.contains('tàu') ||
+        ten.contains('bus') ||
         ten.contains('grab'))
       return Icons.directions_car_rounded;
     return Icons.receipt_long_rounded;
@@ -66,37 +86,57 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   // Lấy màu danh mục
   Color _layMauDanhMuc(String tenDanhMuc) {
     final ten = tenDanhMuc.toLowerCase();
-    if (ten.contains('ăn') || ten.contains('cơm') ||
-        ten.contains('cà phê') || ten.contains('cafe'))
+    if (ten.contains('ăn') ||
+        ten.contains('cơm') ||
+        ten.contains('cà phê') ||
+        ten.contains('cafe'))
       return Colors.orange;
-    if (ten.contains('wifi') || ten.contains('điện') ||
-        ten.contains('nước') || ten.contains('xăng') ||
+    if (ten.contains('wifi') ||
+        ten.contains('điện') ||
+        ten.contains('nước') ||
+        ten.contains('xăng') ||
         ten.contains('gas'))
       return Colors.amber;
-    if (ten.contains('nhật') || ten.contains('sinh') ||
-        ten.contains('quà') || ten.contains('kỷ niệm'))
+    if (ten.contains('nhật') ||
+        ten.contains('sinh') ||
+        ten.contains('quà') ||
+        ten.contains('kỷ niệm'))
       return Colors.pink;
-    if (ten.contains('y tế') || ten.contains('sức khỏe') ||
-        ten.contains('bệnh') || ten.contains('thuốc') ||
-        ten.contains('bs') || ten.contains('viện'))
+    if (ten.contains('y tế') ||
+        ten.contains('sức khỏe') ||
+        ten.contains('bệnh') ||
+        ten.contains('thuốc') ||
+        ten.contains('bs') ||
+        ten.contains('viện'))
       return Colors.red;
-    if (ten.contains('giải') || ten.contains('chơi') ||
-        ten.contains('game') || ten.contains('phim') ||
+    if (ten.contains('giải') ||
+        ten.contains('chơi') ||
+        ten.contains('game') ||
+        ten.contains('phim') ||
         ten.contains('xem'))
       return Colors.purple;
-    if (ten.contains('học') || ten.contains('sách') ||
-        ten.contains('lớp') || ten.contains('nhạc') ||
+    if (ten.contains('học') ||
+        ten.contains('sách') ||
+        ten.contains('lớp') ||
+        ten.contains('nhạc') ||
         ten.contains('course'))
       return Colors.blue;
-    if (ten.contains('nhà') || ten.contains('trọ') ||
-        ten.contains('phòng') || ten.contains('thuê'))
+    if (ten.contains('nhà') ||
+        ten.contains('trọ') ||
+        ten.contains('phòng') ||
+        ten.contains('thuê'))
       return Colors.teal;
-    if (ten.contains('mua') || ten.contains('sắm') ||
-        ten.contains('quần áo') || ten.contains('shopping') ||
-        ten.contains('áo') || ten.contains('giày'))
+    if (ten.contains('mua') ||
+        ten.contains('sắm') ||
+        ten.contains('quần áo') ||
+        ten.contains('shopping') ||
+        ten.contains('áo') ||
+        ten.contains('giày'))
       return Colors.indigo;
-    if (ten.contains('xe') || ten.contains('taxi') ||
-        ten.contains('tàu') || ten.contains('bus') ||
+    if (ten.contains('xe') ||
+        ten.contains('taxi') ||
+        ten.contains('tàu') ||
+        ten.contains('bus') ||
         ten.contains('grab'))
       return Colors.cyan;
     return Colors.grey;
@@ -469,11 +509,22 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               // Lấy tên danh mục từ nested object (Strapi v5 format)
                               String tenDanhMuc = 'Khác';
                               var catObj = attrs['category']?['data'];
+                              
+                              debugPrint('🔍 TX ${gd['id']}: category=${attrs['category']}, catObj=$catObj');
+                              
                               if (catObj != null) {
                                 tenDanhMuc =
                                     catObj['attributes']?['Name'] ??
                                     catObj['Name'] ??
                                     'Khác';
+                                debugPrint('   ✓ Got tenDanhMuc: $tenDanhMuc');
+                              } else {
+                                // Try direct access if data is null
+                                var directCat = attrs['category'];
+                                if (directCat is Map) {
+                                  tenDanhMuc = directCat['Name'] ?? directCat['attributes']?['Name'] ?? 'Khác';
+                                  debugPrint('   ✓ Got tenDanhMuc (direct): $tenDanhMuc');
+                                }
                               }
 
                               final formatTien = NumberFormat.currency(
