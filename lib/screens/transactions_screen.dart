@@ -17,6 +17,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   List _giaoDichHienThi = []; // Danh sách dùng để lọc khi tìm kiếm
   bool _dangTai = true;
   final TextEditingController _timKiemController = TextEditingController();
+  Set<String> _categoriesSelected = {}; // Empty = show all categories
 
   @override
   void initState() {
@@ -252,27 +253,61 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     }
   }
 
+  // Lọc danh sách khi gõ vào thanh tìm kiếm + chọn category
+  String _getTenDanhMucTuGiaoDich(dynamic gd) {
+    final attrs = gd['attributes'] ?? gd;
+    var catObj = attrs['category'];
+    
+    if (catObj != null) {
+      // Path 1: Direct Name field
+      if (catObj is Map && catObj['Name'] != null) {
+        return catObj['Name'];
+      }
+      // Path 2: Via data.attributes.Name
+      else if (catObj['data'] is Map) {
+        return catObj['data']['attributes']?['Name'] ??
+            catObj['data']['Name'] ??
+            'Khác';
+      }
+    }
+    return 'Khác';
+  }
+
+  // Lấy list unique categories từ transactions
+  Set<String> _getUniqueCategoriesFromList(List transactions) {
+    Set<String> categories = {};
+    for (var gd in transactions) {
+      String tenDM = _getTenDanhMucTuGiaoDich(gd);
+      categories.add(tenDM);
+    }
+    return categories;
+  }
+
   // Lọc danh sách khi gõ vào thanh tìm kiếm
   void _locGiaoDich(String tuKhoa) {
     setState(() {
-      if (tuKhoa.isEmpty) {
-        _giaoDichHienThi = _toanBoGiaoDich;
-      } else {
-        _giaoDichHienThi = _toanBoGiaoDich.where((gd) {
+      List filtered = _toanBoGiaoDich;
+      
+      // Filter theo search keyword
+      if (tuKhoa.isNotEmpty) {
+        filtered = filtered.where((gd) {
           final attrs = gd['attributes'] ?? gd;
           final ghiChu = (attrs['note'] ?? '').toLowerCase();
-          // Lấy tên danh mục từ nested object
-          var catObj = attrs['category']?['data'];
-          String danhMuc = 'Khác';
-          if (catObj != null) {
-            danhMuc =
-                (catObj['attributes']?['Name'] ?? catObj['Name'] ?? 'Khác')
-                    .toLowerCase();
-          }
+          String danhMuc = _getTenDanhMucTuGiaoDich(gd).toLowerCase();
           return ghiChu.contains(tuKhoa.toLowerCase()) ||
               danhMuc.contains(tuKhoa.toLowerCase());
         }).toList();
       }
+      
+      // Filter theo selected categories (nếu có chọn)
+      if (_categoriesSelected.isNotEmpty) {
+        filtered = filtered.where((gd) {
+          String tenDM = _getTenDanhMucTuGiaoDich(gd);
+          return _categoriesSelected.contains(tenDM);
+        }).toList();
+      }
+      
+      _giaoDichHienThi = filtered;
     });
   }
 
@@ -344,6 +379,85 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                   borderSide: BorderSide.none,
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+
+          // --- FILTER CHIPS THEO CATEGORY ---
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  // "Tất cả" chip
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: const Text(
+                        'Tất cả',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      selected: _categoriesSelected.isEmpty,
+                      onSelected: (_) {
+                        setState(() {
+                          _categoriesSelected.clear();
+                          _locGiaoDich(_timKiemController.text);
+                        });
+                      },
+                      backgroundColor: Colors.grey.shade200,
+                      selectedColor: Colors.blue.shade100,
+                      labelStyle: TextStyle(
+                        color: _categoriesSelected.isEmpty
+                            ? Colors.blue
+                            : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  // Category chips
+                  ..._getUniqueCategoriesFromList(_toanBoGiaoDich)
+                      .toList()
+                      .asMap()
+                      .entries
+                      .map((entry) {
+                    String category = entry.value;
+                    bool isSelected = _categoriesSelected.contains(category);
+                    IconData icon = _layIconDanhMuc(category);
+                    Color mau = _layMauDanhMuc(category);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        avatar: Icon(
+                          icon,
+                          size: 18,
+                          color: isSelected ? mau : Colors.grey,
+                        ),
+                        label: Text(
+                          category,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() {
+                            if (isSelected) {
+                              _categoriesSelected.remove(category);
+                            } else {
+                              _categoriesSelected.add(category);
+                            }
+                            _locGiaoDich(_timKiemController.text);
+                          });
+                        },
+                        backgroundColor: Colors.grey.shade200,
+                        selectedColor: mau.withOpacity(0.2),
+                        labelStyle: TextStyle(
+                          color: isSelected ? mau : Colors.black87,
+                        ),
+                      ),
+                    );
+                  }),
+                ],
               ),
             ),
           ),
