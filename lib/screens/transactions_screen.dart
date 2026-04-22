@@ -508,22 +508,19 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
 
                               // Lấy tên danh mục từ nested object (Strapi v5 format)
                               String tenDanhMuc = 'Khác';
-                              var catObj = attrs['category']?['data'];
-                              
-                              debugPrint('🔍 TX ${gd['id']}: category=${attrs['category']}, catObj=$catObj');
+                              var catObj = attrs['category'];
                               
                               if (catObj != null) {
-                                tenDanhMuc =
-                                    catObj['attributes']?['Name'] ??
-                                    catObj['Name'] ??
-                                    'Khác';
-                                debugPrint('   ✓ Got tenDanhMuc: $tenDanhMuc');
-                              } else {
-                                // Try direct access if data is null
-                                var directCat = attrs['category'];
-                                if (directCat is Map) {
-                                  tenDanhMuc = directCat['Name'] ?? directCat['attributes']?['Name'] ?? 'Khác';
-                                  debugPrint('   ✓ Got tenDanhMuc (direct): $tenDanhMuc');
+                                // Path 1: Direct Name field
+                                if (catObj is Map && catObj['Name'] != null) {
+                                  tenDanhMuc = catObj['Name'];
+                                }
+                                // Path 2: Via data.attributes.Name
+                                else if (catObj['data'] is Map) {
+                                  tenDanhMuc =
+                                      catObj['data']['attributes']?['Name'] ??
+                                      catObj['data']['Name'] ??
+                                      'Khác';
                                 }
                               }
 
