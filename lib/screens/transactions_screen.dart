@@ -509,7 +509,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                               // Lấy tên danh mục từ nested object (Strapi v5 format)
                               String tenDanhMuc = 'Khác';
                               var catObj = attrs['category'];
-                              
+
                               if (catObj != null) {
                                 // Path 1: Direct Name field
                                 if (catObj is Map && catObj['Name'] != null) {
