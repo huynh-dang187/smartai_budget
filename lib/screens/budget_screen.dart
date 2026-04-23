@@ -32,9 +32,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
   // --- COMBO 3 BƯỚC KHỞI TẠO ĐỘNG ---
   Future<void> _khoiTaoDuLieu() async {
     _prefs = await SharedPreferences.getInstance();
-    await _taiDanhSachDanhMucTuStrapi(); // Bước 1: Kéo danh mục từ mây về
+    await _taiDanhSachDanhMucTuStrapi(); // Bước 1: Kéo danh mục từ mây về - AWAIT
     _taiHanMucDaLuu(); // Bước 2: Gắn hạn mức từ két sắt
-    await _dongBoDuLieuTuStrapi(); // Bước 3: Kéo thu chi về để tính toán
+    await _dongBoDuLieuTuStrapi(); // Bước 3: Kéo thu chi về để tính toán - AWAIT
   }
 
   // BƯỚC 1: LẤY DANH MỤC (MỚI)
@@ -192,7 +192,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
     );
     try {
       String? token =
-          _prefs.getString('jwt_token') ?? _prefs.getString('token');
+          _prefs.getString('jwt') ?? _prefs.getString('token');
 
       final response = await http.get(
         url,
@@ -206,9 +206,26 @@ class _BudgetScreenState extends State<BudgetScreen> {
         final data = json.decode(response.body);
         List allTransactions = data['data'] ?? [];
 
-        // EXTRACT UNIQUE CATEGORIES TỪ TRANSACTIONS
+        // 🔒 FILTER BY USER FIRST - chỉ lấy transactions của user hiện tại
+        final List userTransactions = allTransactions.where((t) {
+          int? userId;
+          if (t['user'] is Map && t['user']['id'] != null) {
+            userId = t['user']['id'];
+          } else if (t['user'] is Map &&
+              t['user']['data'] is Map &&
+              t['user']['data']['id'] != null) {
+            userId = t['user']['data']['id'];
+          } else if (t['attributes'] is Map && t['attributes']['user'] is Map) {
+            userId = t['attributes']['user']['data']?['id'] ??
+                t['attributes']['user']['id'];
+          }
+          if (userId == null) return false;
+          return userId == myId;
+        }).toList();
+
+        // EXTRACT UNIQUE CATEGORIES từ user transactions
         Set<String> uniqueCategories = {};
-        for (var gd in allTransactions) {
+        for (var gd in userTransactions) {
           final attrs = gd['attributes'] ?? gd;
           if (attrs['category'] != null) {
             var cat = attrs['category'];
@@ -339,7 +356,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
     try {
       // 🔑 LẤY TOKEN
       String? token =
-          _prefs.getString('jwt_token') ?? _prefs.getString('token');
+          _prefs.getString('jwt') ?? _prefs.getString('token');
 
       // 🔑 GẮN TOKEN VÀO HEADER
       final response = await http.get(
