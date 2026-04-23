@@ -32,17 +32,16 @@ class _BudgetScreenState extends State<BudgetScreen> {
   // --- COMBO 3 BƯỚC KHỞI TẠO ĐỘNG ---
   Future<void> _khoiTaoDuLieu() async {
     _prefs = await SharedPreferences.getInstance();
-    await _taiDanhSachDanhMucTuStrapi(); // Bước 1: Kéo danh mục từ mây về - AWAIT
+    await _taiDanhSachDanhMucTuStrapi(); // Bước 1: Kéo danh mục từ mây về
     _taiHanMucDaLuu(); // Bước 2: Gắn hạn mức từ két sắt
-    await _dongBoDuLieuTuStrapi(); // Bước 3: Kéo thu chi về để tính toán - AWAIT
+    await _dongBoDuLieuTuStrapi(); // Bước 3: Kéo thu chi về để tính toán
   }
 
   // BƯỚC 1: LẤY DANH MỤC (MỚI)
   Future<void> _taiDanhSachDanhMucTuStrapi() async {
-    int? myId = userIdGlobal.value; // 👈 Lấy ID người dùng ra
-    // 🔒 MIDDLEWARE will filter by user on backend
+    // 🔒 LẤY TẤT CẢ CATEGORIES (không lọc user - categories là shared resource)
     final url = Uri.parse(
-      'http://139.59.242.7:1337/api/categories?populate=user',
+      'http://139.59.242.7:1337/api/categories',
     );
     try {
       // 🔑 LẤY TOKEN
@@ -61,19 +60,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
         final data = json.decode(response.body);
         List allCategories = data['data'] ?? [];
 
-        // 🔒 FILTER: Show if NO user field (legacy) OR user matches
-        final List categories = allCategories.where((c) {
-          final userObj = c['attributes']?['user']?['data'];
-          if (userObj == null) return true; // Show legacy
-          final userId = userObj['id'] ?? userObj['attributes']?['id'];
-          return userId == myId;
-        }).toList();
-        debugPrint(
-          "📊 Budget filtered categories: ${categories.length} for user $myId",
-        );
-
+        // 🔥 LẤY TẤT CẢ CATEGORIES (không lọc) - user có thể set budget cho bất kỳ category nào
         List<Map<String, dynamic>> dmTam = [];
-        for (var item in categories) {
+        for (var item in allCategories) {
           final attrs = item['attributes'] ?? item;
           String tenDM = attrs['Name'] ?? 'Khác';
 
@@ -171,28 +160,27 @@ class _BudgetScreenState extends State<BudgetScreen> {
           danhSachNganSach = dmTam;
         });
       } else {
-        // 🚨 API FAILED - TRY FALLBACK
+        // 🚨 API FAILED - TRY FALLBACK: Thêm categories từ user's transactions
         debugPrint(
-          "❌ Lỗi tải danh mục API: ${response.statusCode}, dùng fallback từ transactions",
+          "❌ Lỗi tải danh mục API: ${response.statusCode}, dùng fallback từ transactions của user",
         );
-        await _extractCategoriesFromTransactionsData();
+        await _mergeUserTransactionCategories();
       }
     } catch (e) {
       // 🚨 BẮT LỖI MẠNG - TRY FALLBACK
-      debugPrint("❌ Lỗi tải danh mục: $e, dùng fallback từ transactions");
-      await _extractCategoriesFromTransactionsData();
+      debugPrint("❌ Lỗi tải danh mục: $e, dùng fallback từ transactions của user");
+      await _mergeUserTransactionCategories();
     }
   }
 
-  // FALLBACK: EXTRACT CATEGORIES TỪ TRANSACTION DATA
-  Future<void> _extractCategoriesFromTransactionsData() async {
+  // HELPER: MERGE categories từ user's transactions vào existing list
+  Future<void> _mergeUserTransactionCategories() async {
     int? myId = userIdGlobal.value;
     final url = Uri.parse(
       'http://139.59.242.7:1337/api/transactions?populate=category&populate=user',
     );
     try {
-      String? token =
-          _prefs.getString('jwt') ?? _prefs.getString('token');
+      String? token = _prefs.getString('jwt') ?? _prefs.getString('token');
 
       final response = await http.get(
         url,
@@ -206,7 +194,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
         final data = json.decode(response.body);
         List allTransactions = data['data'] ?? [];
 
-        // 🔒 FILTER BY USER FIRST - chỉ lấy transactions của user hiện tại
+        // 🔒 Lọc transactions của user hiện tại
         final List userTransactions = allTransactions.where((t) {
           int? userId;
           if (t['user'] is Map && t['user']['id'] != null) {
@@ -223,8 +211,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
           return userId == myId;
         }).toList();
 
-        // EXTRACT UNIQUE CATEGORIES từ user transactions
-        Set<String> uniqueCategories = {};
+        // EXTRACT UNIQUE CATEGORIES TỪ USER TRANSACTIONS
+        Set<String> existingNames = danhSachNganSach.map((dm) => dm['ten'] as String).toSet();
+        Set<String> userTransactionCategories = {};
+
         for (var gd in userTransactions) {
           final attrs = gd['attributes'] ?? gd;
           if (attrs['category'] != null) {
@@ -236,92 +226,96 @@ class _BudgetScreenState extends State<BudgetScreen> {
               tenDM =
                   (cat['data']['attributes'] ?? cat['data'])['Name'] ?? 'Khác';
             }
-            uniqueCategories.add(tenDM);
+            userTransactionCategories.add(tenDM);
           }
         }
 
         debugPrint(
-          "📊 Fallback: extracted ${uniqueCategories.length} categories from transactions",
+          "📊 User transaction categories: ${userTransactionCategories.length}, existing: ${existingNames.length}",
         );
 
-        List<Map<String, dynamic>> dmTam = [];
-        for (var tenDM in uniqueCategories) {
-          IconData icon = Icons.category_rounded;
-          Color mau = Colors.blueGrey;
+        // 🔄 MERGE: Thêm categories từ transactions vào existing list (nếu chưa có)
+        List<Map<String, dynamic>> newCategories = [];
+        for (var tenDM in userTransactionCategories) {
+          if (!existingNames.contains(tenDM)) {
+            // Category mới - thêm vào
+            IconData icon = Icons.category_rounded;
+            Color mau = Colors.blueGrey;
+            String tenToLowerCase = tenDM.toLowerCase();
 
-          // Auto-assign icons based on name (COMPREHENSIVE MATCHING)
-          String tenToLowerCase = tenDM.toLowerCase();
+            if (tenToLowerCase.contains('ăn') ||
+                tenToLowerCase.contains('cơm') ||
+                tenToLowerCase.contains('cà phê') ||
+                tenToLowerCase.contains('trà')) {
+              icon = Icons.fastfood_rounded;
+              mau = Colors.orange;
+            } else if (tenToLowerCase.contains('wifi') ||
+                tenToLowerCase.contains('điện') ||
+                tenToLowerCase.contains('nước') ||
+                tenToLowerCase.contains('xăng') ||
+                tenToLowerCase.contains('gas')) {
+              icon = Icons.bolt_rounded;
+              mau = Colors.amber;
+            } else if (tenToLowerCase.contains('nhật') ||
+                tenToLowerCase.contains('sinh') ||
+                tenToLowerCase.contains('quà') ||
+                tenToLowerCase.contains('kỷ niệm')) {
+              icon = Icons.cake_rounded;
+              mau = Colors.pink;
+            } else if (tenToLowerCase.contains('y tế') ||
+                tenToLowerCase.contains('sức khỏe') ||
+                tenToLowerCase.contains('bệnh') ||
+                tenToLowerCase.contains('thuốc') ||
+                tenToLowerCase.contains('bác sĩ')) {
+              icon = Icons.medical_services_rounded;
+              mau = Colors.red;
+            } else if (tenToLowerCase.contains('giải') ||
+                tenToLowerCase.contains('chơi') ||
+                tenToLowerCase.contains('game') ||
+                tenToLowerCase.contains('phim')) {
+              icon = Icons.sports_esports_rounded;
+              mau = Colors.purple;
+            } else if (tenToLowerCase.contains('học') ||
+                tenToLowerCase.contains('sách') ||
+                tenToLowerCase.contains('lớp') ||
+                tenToLowerCase.contains('nhạc')) {
+              icon = Icons.school_rounded;
+              mau = Colors.blue;
+            } else if (tenToLowerCase.contains('nhà') ||
+                tenToLowerCase.contains('trọ') ||
+                tenToLowerCase.contains('phòng')) {
+              icon = Icons.home_rounded;
+              mau = Colors.teal;
+            } else if (tenToLowerCase.contains('mua') ||
+                tenToLowerCase.contains('sắm') ||
+                tenToLowerCase.contains('quần áo') ||
+                tenToLowerCase.contains('đồ')) {
+              icon = Icons.shopping_bag_rounded;
+              mau = Colors.indigo;
+            } else if (tenToLowerCase.contains('xe') ||
+                tenToLowerCase.contains('xe buýt') ||
+                tenToLowerCase.contains('taxi') ||
+                tenToLowerCase.contains('tàu')) {
+              icon = Icons.directions_car_rounded;
+              mau = Colors.cyan;
+            }
 
-          if (tenToLowerCase.contains('ăn') ||
-              tenToLowerCase.contains('cơm') ||
-              tenToLowerCase.contains('cà phê') ||
-              tenToLowerCase.contains('trà')) {
-            icon = Icons.fastfood_rounded;
-            mau = Colors.orange;
-          } else if (tenToLowerCase.contains('wifi') ||
-              tenToLowerCase.contains('điện') ||
-              tenToLowerCase.contains('nước') ||
-              tenToLowerCase.contains('xăng') ||
-              tenToLowerCase.contains('gas')) {
-            icon = Icons.bolt_rounded;
-            mau = Colors.amber;
-          } else if (tenToLowerCase.contains('nhật') ||
-              tenToLowerCase.contains('sinh') ||
-              tenToLowerCase.contains('quà') ||
-              tenToLowerCase.contains('kỷ niệm')) {
-            icon = Icons.cake_rounded;
-            mau = Colors.pink;
-          } else if (tenToLowerCase.contains('y tế') ||
-              tenToLowerCase.contains('sức khỏe') ||
-              tenToLowerCase.contains('bệnh') ||
-              tenToLowerCase.contains('thuốc') ||
-              tenToLowerCase.contains('bác sĩ')) {
-            icon = Icons.medical_services_rounded;
-            mau = Colors.red;
-          } else if (tenToLowerCase.contains('giải') ||
-              tenToLowerCase.contains('chơi') ||
-              tenToLowerCase.contains('game') ||
-              tenToLowerCase.contains('phim')) {
-            icon = Icons.sports_esports_rounded;
-            mau = Colors.purple;
-          } else if (tenToLowerCase.contains('học') ||
-              tenToLowerCase.contains('sách') ||
-              tenToLowerCase.contains('lớp') ||
-              tenToLowerCase.contains('nhạc')) {
-            icon = Icons.school_rounded;
-            mau = Colors.blue;
-          } else if (tenToLowerCase.contains('nhà') ||
-              tenToLowerCase.contains('trọ') ||
-              tenToLowerCase.contains('phòng')) {
-            icon = Icons.home_rounded;
-            mau = Colors.teal;
-          } else if (tenToLowerCase.contains('mua') ||
-              tenToLowerCase.contains('sắm') ||
-              tenToLowerCase.contains('quần áo') ||
-              tenToLowerCase.contains('đồ')) {
-            icon = Icons.shopping_bag_rounded;
-            mau = Colors.indigo;
-          } else if (tenToLowerCase.contains('xe') ||
-              tenToLowerCase.contains('xe buýt') ||
-              tenToLowerCase.contains('taxi') ||
-              tenToLowerCase.contains('tàu')) {
-            icon = Icons.directions_car_rounded;
-            mau = Colors.cyan;
+            newCategories.add({
+              "ten": tenDM,
+              "daTieu": 0.0,
+              "hanMuc": 1000000.0,
+              "icon": icon,
+              "mauIcon": mau,
+            });
           }
-
-          dmTam.add({
-            "ten": tenDM,
-            "daTieu": 0.0,
-            "hanMuc": 1000000.0,
-            "icon": icon,
-            "mauIcon": mau,
-          });
         }
 
         setState(() {
-          danhSachNganSach = dmTam;
+          danhSachNganSach.addAll(newCategories);
         });
-        debugPrint("✅ Fallback categories loaded successfully");
+        debugPrint(
+          "✅ Merged ${newCategories.length} new categories from user transactions",
+        );
       } else {
         debugPrint("❌ Fallback also failed: ${response.statusCode}");
         setState(() => _dangTai = false);
@@ -404,7 +398,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
         Map<String, double> tienTheoDanhMuc = {};
 
-        for (var gd in giaoDich) {
+        for (var gd in allTransactions) {
           final attrs = gd['attributes'] ?? gd;
           if (attrs['date'] == null) continue;
           DateTime dt = DateTime.parse(attrs['date']).toLocal();
