@@ -387,7 +387,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
         Map<String, double> tienTheoDanhMuc = {};
 
-        for (var gd in allTransactions) {
+        for (var gd in giaoDich) {
           final attrs = gd['attributes'] ?? gd;
           if (attrs['date'] == null) continue;
           DateTime dt = DateTime.parse(attrs['date']).toLocal();
