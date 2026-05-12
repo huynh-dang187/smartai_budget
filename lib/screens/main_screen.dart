@@ -27,7 +27,7 @@ class _MainScreenState extends State<MainScreen> {
 
   // 🤖 Biến cho AI Expandable Form
   late TextEditingController _aiController;
-  String _ketQuaAI = "Hãy gõ hoặc nói chi tiêu của bạn.\nVí dụ: 'Trưa nay ăn phở hết 45k'";
+  String _ketQuaAI = "Nói chi tiêu của bạn\nVí dụ: 'Ăn phở 45k'";
   Map<String, dynamic> _tuDienDanhMucAI = {};
   final stt.SpeechToText _speechAI = stt.SpeechToText();
   bool _isListeningAI = false;
@@ -136,13 +136,13 @@ class _MainScreenState extends State<MainScreen> {
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Colors.blueAccent,
-                  child: Icon(Icons.auto_awesome, color: Colors.white),
+                  child: Icon(Icons.mic_rounded, color: Colors.white),
                 ),
                 title: const Text(
-                  "Nhập bằng AI",
+                  "Nhập bằng giọng nói",
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                subtitle: const Text("Tự động nhận diện số tiền & danh mục"),
+                subtitle: const Text("Nói chi tiêu, hệ thống sẽ ghi lại"),
                 onTap: () {
                   Navigator.pop(ctx);
                   _goiAI(context);
@@ -173,7 +173,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _goiAI(BuildContext context) {
-    _ketQuaAI = "Hãy gõ hoặc nói chi tiêu của bạn.\nVí dụ: 'Trưa nay ăn phở hết 45k'";
+    _ketQuaAI = "Nói chi tiêu của bạn\nVí dụ: 'Ăn phở 45k'";
     _aiController.clear();
     _taiDanhSachDanhMucAI();
     _moFormAI(context);
@@ -237,12 +237,12 @@ class _MainScreenState extends State<MainScreen> {
     String text = _aiController.text;
     if (text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Vui lòng nhập hoặc nói gì đó!")),
+        const SnackBar(content: Text("Vui lòng nhập hoặc nói gì đó!")),
       );
       return;
     }
 
-    setState(() => _ketQuaAI = "⏳ AI đang suy nghĩ...");
+    setState(() => _ketQuaAI = "Đang xử lý...");
     _aiController.clear();
     String cacDanhMucHienCo = _tuDienDanhMucAI.keys.join(", ");
     if (cacDanhMucHienCo.isEmpty) cacDanhMucHienCo = "Khác";
@@ -271,13 +271,13 @@ class _MainScreenState extends State<MainScreen> {
       await _luuGiaoDichAILenStrapi(soTienChuan, data['note'], data['category']);
 
       setState(() {
-        _ketQuaAI = "🎉 AI đã bóc tách thành công!\n\n"
-            "💰 Số tiền: ${data['amount']} VNĐ\n"
-            "📝 Ghi chú: ${data['note']}\n"
-            "🏷️ Danh mục: ${data['category']}";
+        _ketQuaAI = "Bóc tách thành công!\n\n"
+            "Số tiền: ${data['amount']} VNĐ\n"
+            "Ghi chú: ${data['note']}\n"
+            "Danh mục: ${data['category']}";
       });
     } catch (e) {
-      setState(() => _ketQuaAI = "❌ Úi, AI bị lú hoặc mạng có vấn đề: $e");
+      setState(() => _ketQuaAI = "Lỗi xử lý: $e");
     }
   }
 
@@ -319,7 +319,7 @@ class _MainScreenState extends State<MainScreen> {
       if (response.statusCode == 201 || response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 Đã lưu vào sổ!'),
+            content: Text('Đã lưu vào sổ'),
             backgroundColor: Colors.green,
           ),
         );
@@ -377,7 +377,7 @@ class _MainScreenState extends State<MainScreen> {
                         child: Row(
                           children: [
                             const Text(
-                              "Trợ lý AI",
+                              "Ghi chép giọng nói",
                               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
                             ),
                             const Spacer(),
@@ -811,7 +811,7 @@ class _MainScreenState extends State<MainScreen> {
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text("🎉 Đã lưu vào sổ!"),
+                                  content: Text("Đã lưu vào sổ"),
                                   backgroundColor: Colors.green,
                                 ),
                               );

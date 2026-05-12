@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../main.dart';
 
 class BudgetScreen extends StatefulWidget {
@@ -451,53 +452,33 @@ class _BudgetScreenState extends State<BudgetScreen> {
   List<Map<String, String>> _kiemTraCacCanhBao() {
     List<Map<String, String>> canhBaoList = [];
 
-    // ⚠️ CẢNH BÁO 1: Tổng hạn mục > thu nhập
+    // CẢNH BÁO 1: Tổng hạn mục > thu nhập
     if (thuNhapThang > 0 && tongNganSach > thuNhapThang) {
       double chenhLech = tongNganSach - thuNhapThang;
       canhBaoList.add({
         'type': 'income',
-        'icon': '⚠️',
         'title': 'Hạn mục cao hơn thu nhập',
         'message': 'Tổng hạn mục ${_formatTien(tongNganSach)} vượt thu nhập ${_formatTien(thuNhapThang)} (chênh lệch: +${_formatTien(chenhLech)})',
         'color': 'orange',
       });
     }
 
-    // 🔴 CẢNH BÁO 2: Danh mục chưa custom set hạn mức
-    List<String> danh_muc_chua_set = [];
-    for (var ns in danhSachNganSach) {
-      if (ns['hanMuc'] == 1000000.0) {
-        danh_muc_chua_set.add(ns['ten']);
-      }
-    }
-    if (danh_muc_chua_set.isNotEmpty) {
-      canhBaoList.add({
-        'type': 'unconfigured',
-        'icon': '🔴',
-        'title': 'Danh mục chưa set hạn mức',
-        'message': 'Cần set hạn mức cho: ${danh_muc_chua_set.join(", ")}',
-        'color': 'red',
-      });
-    }
-
-    // 🔴 CẢNH BÁO 3: Chi tiêu vượt 1.2x hạn mục
+    // CẢNH BÁO 2: Chi tiêu vượt 1.2x hạn mục
     if (tongNganSach > 0 && tongDaTieu > tongNganSach * 1.2) {
       double vuotMucBao = tongDaTieu - (tongNganSach * 1.2);
       canhBaoList.add({
         'type': 'overspend',
-        'icon': '🔴',
         'title': 'Chi tiêu vượt mức báo động',
         'message': 'Đã vượt 20% hạn mục ${_formatTien(vuotMucBao)}. Kiểm tra lại chi tiêu!',
         'color': 'red',
       });
     }
 
-    // 📊 CẢNH BÁO 4: So sánh với tháng trước
+    // CẢNH BÁO 3: So sánh với tháng trước
     if (previousMonthOverage != 0) {
       String so_sanh = previousMonthOverage > 0 ? 'vượt' : 'dưới';
       canhBaoList.add({
         'type': 'history',
-        'icon': '📊',
         'title': 'Thống kê tháng trước',
         'message': 'Tháng trước $so_sanh ${previousMonthOverage.abs().toStringAsFixed(1)}% hạn mức',
         'color': 'blue',
@@ -572,13 +553,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   String chuoiSoSanh = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
                   double val = double.tryParse(chuoiSoSanh) ?? 0.0;
                   await _prefs.setDouble('thuNhapThang', val);
-                  setState(() => thuNhapThang = val);
+                  
+                  setState(() {
+                    thuNhapThang = val;
+                    // Refresh cảnh báo bằng cách gọi _kiemTraCacCanhBao() implicitly qua setState
+                  });
+                  
                   if (context.mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✨ Đã lưu thu nhập!'),
-                        backgroundColor: Colors.green,
+                      SnackBar(
+                        content: Text(
+                          val > 0
+                              ? 'Đã lưu thu nhập: ${_formatTien(val)}'
+                              : 'Đã xóa thu nhập',
+                        ),
+                        backgroundColor: Colors.blueAccent,
                       ),
                     );
                   }
@@ -698,7 +688,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text("✨ Đã lưu cấu hình ngân sách!"),
+                          content: Text("Đã lưu cấu hình ngân sách"),
                           backgroundColor: Colors.green,
                         ),
                       );
@@ -724,6 +714,149 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   String _formatTien(num tien) =>
       NumberFormat.currency(locale: 'vi_VN', symbol: 'đ').format(tien);
+
+  Widget _buildHistoryChart() {
+    // Tính % chi tiêu tháng này
+    double currentMonthPercent = 0.0;
+    if (tongNganSach > 0) {
+      currentMonthPercent = (tongDaTieu / tongNganSach) * 100;
+    }
+    
+    // % tháng trước từ SharedPreferences
+    double previousMonthPercent = previousMonthOverage.abs();
+    
+    // Lấy tháng hiện tại
+    DateTime now = DateTime.now();
+    int currentMonth = now.month;
+    int previousMonth = currentMonth == 1 ? 12 : currentMonth - 1;
+    
+    String currentMonthName = 'Tháng $currentMonth';
+    String previousMonthName = 'Tháng $previousMonth';
+    
+    // Chuẩn hóa giá trị max để biểu đồ hiển thị đẹp
+    double maxValue = previousMonthPercent > currentMonthPercent 
+        ? previousMonthPercent + 20 
+        : currentMonthPercent + 20;
+    if (maxValue > 150) maxValue = 150;
+
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        children: [
+          // 📊 BIỂU ĐỒ CỘT
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                maxY: maxValue,
+                barTouchData: BarTouchData(enabled: false),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return Text(previousMonthName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
+                        if (value == 1) return Text(currentMonthName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold));
+                        return const SizedBox();
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        return Text('${value.toInt()}%', style: const TextStyle(fontSize: 9, color: Colors.grey));
+                      },
+                      reservedSize: 35,
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 20,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.grey.shade200,
+                    strokeWidth: 1,
+                  ),
+                ),
+                barGroups: [
+                  // 🔵 Cột tháng trước (màu xanh)
+                  BarChartGroupData(
+                    x: 0,
+                    barRods: [
+                      BarChartRodData(
+                        toY: previousMonthPercent,
+                        color: Colors.blue.shade400,
+                        width: 30,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                      ),
+                    ],
+                  ),
+                  // 🟠 Cột tháng này (màu cam/đỏ tùy %)
+                  BarChartGroupData(
+                    x: 1,
+                    barRods: [
+                      BarChartRodData(
+                        toY: currentMonthPercent,
+                        color: currentMonthPercent > 100 
+                            ? Colors.red.shade400 
+                            : Colors.orange.shade400,
+                        width: 30,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // 📝 CHÚ THÍCH
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$previousMonthName: ${previousMonthPercent.toStringAsFixed(1)}%',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 20),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: currentMonthPercent > 100 
+                        ? Colors.red.shade400 
+                        : Colors.orange.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '$currentMonthName: ${currentMonthPercent.toStringAsFixed(1)}%',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _veThanhTienTrinh(double daTieu, double hanMuc) {
     double phanTram = hanMuc <= 0 ? 0.0 : daTieu / hanMuc;
@@ -873,6 +1006,44 @@ class _BudgetScreenState extends State<BudgetScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 15),
+                        // 💰 SET THU NHẬP BÊN TRONG BOX
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Thu nhập/tháng',
+                                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    thuNhapThang > 0 ? _formatTien(thuNhapThang) : 'Chưa set',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _hienThiBangChinhSuaThuNhap,
+                              icon: const Icon(Icons.edit, size: 16),
+                              label: const Text('Set'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.9),
+                                foregroundColor: Colors.blueAccent,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -899,31 +1070,32 @@ class _BudgetScreenState extends State<BudgetScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Text(warning['icon']!, style: const TextStyle(fontSize: 18)),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      warning['title']!,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                        color: borderColor,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 5),
                               Text(
-                                warning['message']!,
+                                warning['title']!,
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                  height: 1.4,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: borderColor,
                                 ),
                               ),
+                              const SizedBox(height: 8),
+                              
+                              // SPECIAL DISPLAY FOR HISTORY WARNING
+                              if (warning['type'] == 'history')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: _buildHistoryChart(),
+                                )
+                              else
+                                Text(
+                                  warning['message']!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade700,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              
                               if (warning['type'] == 'income')
                                 Padding(
                                   padding: const EdgeInsets.only(top: 10),
@@ -944,28 +1116,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                         );
                       }),
 
-                      const SizedBox(height: 10),
-
-                      // 💰 NÚT CHỈNH SỬA THU NHẬP
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: ElevatedButton.icon(
-                          onPressed: _hienThiBangChinhSuaThuNhap,
-                          icon: const Icon(Icons.attach_money, size: 18),
-                          label: Text(
-                            thuNhapThang > 0
-                                ? 'Thu nhập: ${_formatTien(thuNhapThang)}'
-                                : 'Set Thu nhập',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade600,
-                            minimumSize: const Size(double.infinity, 45),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
+                      const SizedBox(height: 20),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
