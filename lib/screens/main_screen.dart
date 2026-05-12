@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart'; // 📌 Bổ sung thư viện này để Format tiền tệ!
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import 'home_screen.dart';
 import 'chat_ai_screen.dart';
@@ -22,12 +25,32 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
+  // 🤖 Biến cho AI Expandable Form
+  late TextEditingController _aiController;
+  String _ketQuaAI = "Hãy gõ hoặc nói chi tiêu của bạn.\nVí dụ: 'Trưa nay ăn phở hết 45k'";
+  Map<String, dynamic> _tuDienDanhMucAI = {};
+  final stt.SpeechToText _speechAI = stt.SpeechToText();
+  bool _isListeningAI = false;
+
   late List<Widget> _pages = [
     HomeScreen(key: UniqueKey()),
     const TransactionsScreen(),
     const BudgetScreen(),
     const SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _aiController = TextEditingController();
+    _speechAI.initialize();
+  }
+
+  @override
+  void dispose() {
+    _aiController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,18 +173,320 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _goiAI(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ChatAIScreen()),
-    ).then((value) {
-      setState(() {
-        _currentIndex = 0;
-        _pages[0] = HomeScreen(key: UniqueKey());
-      });
-    });
+    _ketQuaAI = "Hãy gõ hoặc nói chi tiêu của bạn.\nVí dụ: 'Trưa nay ăn phở hết 45k'";
+    _aiController.clear();
+    _taiDanhSachDanhMucAI();
+    _moFormAI(context);
   }
 
-  // --- HÀM XÂY CỬA THOÁT HIỂM: FORM NHẬP TAY (UI HIỆN ĐẠI) ---
+  // 🤖 HÀM TẢI DANH MỤC CHO AI
+  Future<void> _taiDanhSachDanhMucAI() async {
+    String? token = userTokenGlobal.value;
+    final url = Uri.parse('http://139.59.242.7:1337/api/categories');
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List danhSach = data['data'];
+
+        setState(() {
+          for (var item in danhSach) {
+            String tenDM = item['attributes']?['Name'] ?? item['Name']?.toString() ?? 'Khác';
+            var idDM = item['id'] ?? item['documentId'];
+            if (idDM != null) {
+              _tuDienDanhMucAI[tenDM.trim().toLowerCase()] = idDM;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ Lỗi tải danh mục AI: $e");
+    }
+  }
+
+  // 🎙️ HÀM GHI ÂM CHO AI
+  void _langNgheGiongNoiAI() async {
+    if (!_isListeningAI) {
+      bool available = await _speechAI.initialize(
+        onStatus: (val) => debugPrint('Trạng thái Mic: $val'),
+        onError: (val) => debugPrint('Lỗi Mic: $val'),
+      );
+      if (available) {
+        setState(() => _isListeningAI = true);
+        _speechAI.listen(
+          onResult: (val) => setState(() {
+            _aiController.text = val.recognizedWords;
+          }),
+          localeId: 'vi_VN',
+        );
+      }
+    } else {
+      setState(() => _isListeningAI = false);
+      _speechAI.stop();
+    }
+  }
+
+  // 🚀 HÀM GỬI TIN NHẮN AI
+  void _guiTinNhanAI() async {
+    String text = _aiController.text;
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ Vui lòng nhập hoặc nói gì đó!")),
+      );
+      return;
+    }
+
+    setState(() => _ketQuaAI = "⏳ AI đang suy nghĩ...");
+    _aiController.clear();
+    String cacDanhMucHienCo = _tuDienDanhMucAI.keys.join(", ");
+    if (cacDanhMucHienCo.isEmpty) cacDanhMucHienCo = "Khác";
+
+    final prompt = '''
+      Bạn là một trợ lý ảo quản lý chi tiêu. Người dùng vừa nhập câu sau: "$text".
+      Hãy trích xuất thông tin và CHỈ TRẢ VỀ ĐÚNG 1 CỤC JSON, tuyệt đối không giải thích gì thêm.
+      Định dạng bắt buộc:
+      {
+        "amount": (số tiền bằng số nguyên, ví dụ 45000),
+        "note": "(ghi chú ngắn gọn món đồ)",
+        "category": "(chọn 1 TRONG CÁC TỪ SAU ĐÂY: $cacDanhMucHienCo)"
+      }
+    ''';
+
+    try {
+      final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      final model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
+      final response = await model.generateContent([Content.text(prompt)]);
+      String aiReply = response.text ?? "{}";
+
+      aiReply = aiReply.replaceAll('```json', '').replaceAll('```', '').trim();
+      final data = json.decode(aiReply);
+      int soTienChuan = int.tryParse(data['amount'].toString()) ?? 0;
+
+      await _luuGiaoDichAILenStrapi(soTienChuan, data['note'], data['category']);
+
+      setState(() {
+        _ketQuaAI = "🎉 AI đã bóc tách thành công!\n\n"
+            "💰 Số tiền: ${data['amount']} VNĐ\n"
+            "📝 Ghi chú: ${data['note']}\n"
+            "🏷️ Danh mục: ${data['category']}";
+      });
+    } catch (e) {
+      setState(() => _ketQuaAI = "❌ Úi, AI bị lú hoặc mạng có vấn đề: $e");
+    }
+  }
+
+  // 💾 HÀM LƯU GIAO DỊCH AI LÊN STRAPI
+  Future<void> _luuGiaoDichAILenStrapi(int amount, String note, String categoryName) async {
+    final url = Uri.parse('http://139.59.242.7:1337/api/transactions');
+    String tenChuan = categoryName.trim().toLowerCase();
+    dynamic categoryId = _tuDienDanhMucAI[tenChuan];
+
+    if (categoryId == null && _tuDienDanhMucAI.isNotEmpty) {
+      categoryId = _tuDienDanhMucAI.values.first;
+    }
+
+    String? token = userTokenGlobal.value;
+    int? myId = userIdGlobal.value;
+
+    debugPrint("🔍 [AI] Token: ${token?.substring(0, 20)}...");
+    debugPrint("🔍 [AI] Category ID: $categoryId");
+
+    try {
+      final body = {
+        "data": {
+          "amount": amount,
+          "note": note,
+          "date": DateTime.now().toUtc().toIso8601String(),
+          "category": categoryId,
+        },
+      };
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Đã lưu vào sổ!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        await Future.delayed(Duration(milliseconds: 800));
+        if (mounted) Navigator.pop(context);
+        refreshDataGlobal.value = true;
+        setState(() {
+          _currentIndex = 0;
+          _pages[0] = HomeScreen(key: UniqueKey());
+        });
+      } else {
+        debugPrint("❌ [AI] Error ${response.statusCode}: ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("❌ [AI] Network error: $e");
+    }
+  }
+
+  // 📱 EXPANDABLE MODAL FORM AI
+  void _moFormAI(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.35,
+          minChildSize: 0.35,
+          maxChildSize: 1.0,
+          expand: false,
+          builder: (context, scrollController) {
+            return StatefulBuilder(
+              builder: (context, setStateAI) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                  ),
+                  child: Column(
+                    children: [
+                      // 🔝 HANDLE BAR
+                      Container(
+                        width: 40,
+                        height: 5,
+                        margin: const EdgeInsets.only(top: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+
+                      // ✨ HEADER
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                        child: Row(
+                          children: [
+                            const Text(
+                              "Trợ lý AI",
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.close, color: Colors.grey),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+
+                      // 📝 AI RESPONSE AREA
+                      Expanded(
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.blueAccent.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(15),
+                                border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                              ),
+                              child: Text(
+                                _ketQuaAI,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.blueAccent,
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // ⌨️ INPUT AREA
+                      Container(
+                        padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _aiController,
+                                decoration: InputDecoration(
+                                  hintText: 'Ăn phở 45k...',
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(25)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.clear, color: Colors.grey),
+                                    onPressed: () => _aiController.clear(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // 🎙️ MIC BUTTON
+                            GestureDetector(
+                              onTapDown: (details) => _langNgheGiongNoiAI(),
+                              onTapUp: (details) {
+                                setState(() => _isListeningAI = false);
+                                _speechAI.stop();
+                              },
+                              child: CircleAvatar(
+                                radius: 22,
+                                backgroundColor: _isListeningAI ? Colors.orange : Colors.blueAccent,
+                                child: Icon(
+                                  _isListeningAI ? Icons.mic : Icons.mic_none,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // 🚀 SEND BUTTON
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Colors.blueAccent,
+                              child: IconButton(
+                                icon: const Icon(Icons.send, color: Colors.white, size: 18),
+                                onPressed: () => _guiTinNhanAI(),
+                                padding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _moFormNhapTay() async {
     showDialog(
       context: context,

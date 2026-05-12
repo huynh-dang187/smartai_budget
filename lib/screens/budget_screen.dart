@@ -19,6 +19,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   double tongNganSach = 0.0;
   double tongDaTieu = 0.0;
+  double thuNhapThang = 0.0; // 💰 Thu nhập tháng để check
+  double previousMonthOverage = 0.0; // 📊 % vượt tháng trước
 
   // Xóa sạch Hard-code! Giờ nó là một mảng rỗng đợi Strapi rót data vào
   List<Map<String, dynamic>> danhSachNganSach = [];
@@ -34,14 +36,22 @@ class _BudgetScreenState extends State<BudgetScreen> {
     _prefs = await SharedPreferences.getInstance();
     await _taiDanhSachDanhMucTuStrapi(); // Bước 1: Kéo danh mục từ mây về
     _taiHanMucDaLuu(); // Bước 2: Gắn hạn mức từ két sắt
+    _taiThuNhapVaThongKeThangTruoc(); // 💰 Bước 2.5: Load thu nhập + thống kê
     await _dongBoDuLieuTuStrapi(); // Bước 3: Kéo thu chi về để tính toán
+  }
+
+  // 💰 HÀM TẢI THU NHẬP VÀ THỐNG KÊ
+  void _taiThuNhapVaThongKeThangTruoc() {
+    thuNhapThang = _prefs.getDouble('thuNhapThang') ?? 0.0;
+    previousMonthOverage = _prefs.getDouble('previousMonthOverage') ?? 0.0;
   }
 
   // BƯỚC 1: LẤY DANH MỤC (MỚI)
   Future<void> _taiDanhSachDanhMucTuStrapi() async {
-    // 🔒 LẤY TẤT CẢ CATEGORIES (không lọc user - categories là shared resource)
+    int? myId = userIdGlobal.value; // 👈 Lấy ID người dùng ra
+    // 🔒 MIDDLEWARE will filter by user on backend
     final url = Uri.parse(
-      'http://139.59.242.7:1337/api/categories',
+      'http://139.59.242.7:1337/api/categories?populate=user',
     );
     try {
       // 🔑 LẤY TOKEN
@@ -60,9 +70,19 @@ class _BudgetScreenState extends State<BudgetScreen> {
         final data = json.decode(response.body);
         List allCategories = data['data'] ?? [];
 
-        // 🔥 LẤY TẤT CẢ CATEGORIES (không lọc) - user có thể set budget cho bất kỳ category nào
+        // 🔒 FILTER: Show if NO user field (legacy) OR user matches
+        final List categories = allCategories.where((c) {
+          final userObj = c['attributes']?['user']?['data'];
+          if (userObj == null) return true; // Show legacy
+          final userId = userObj['id'] ?? userObj['attributes']?['id'];
+          return userId == myId;
+        }).toList();
+        debugPrint(
+          "📊 Budget filtered categories: ${categories.length} for user $myId",
+        );
+
         List<Map<String, dynamic>> dmTam = [];
-        for (var item in allCategories) {
+        for (var item in categories) {
           final attrs = item['attributes'] ?? item;
           String tenDM = attrs['Name'] ?? 'Khác';
 
@@ -160,27 +180,28 @@ class _BudgetScreenState extends State<BudgetScreen> {
           danhSachNganSach = dmTam;
         });
       } else {
-        // 🚨 API FAILED - TRY FALLBACK: Thêm categories từ user's transactions
+        // 🚨 API FAILED - TRY FALLBACK
         debugPrint(
-          "❌ Lỗi tải danh mục API: ${response.statusCode}, dùng fallback từ transactions của user",
+          "❌ Lỗi tải danh mục API: ${response.statusCode}, dùng fallback từ transactions",
         );
-        await _mergeUserTransactionCategories();
+        await _extractCategoriesFromTransactionsData();
       }
     } catch (e) {
       // 🚨 BẮT LỖI MẠNG - TRY FALLBACK
-      debugPrint("❌ Lỗi tải danh mục: $e, dùng fallback từ transactions của user");
-      await _mergeUserTransactionCategories();
+      debugPrint("❌ Lỗi tải danh mục: $e, dùng fallback từ transactions");
+      await _extractCategoriesFromTransactionsData();
     }
   }
 
-  // HELPER: MERGE categories từ user's transactions vào existing list
-  Future<void> _mergeUserTransactionCategories() async {
+  // FALLBACK: EXTRACT CATEGORIES TỪ TRANSACTION DATA
+  Future<void> _extractCategoriesFromTransactionsData() async {
     int? myId = userIdGlobal.value;
     final url = Uri.parse(
       'http://139.59.242.7:1337/api/transactions?populate=category&populate=user',
     );
     try {
-      String? token = _prefs.getString('jwt') ?? _prefs.getString('token');
+      String? token =
+          _prefs.getString('jwt_token') ?? _prefs.getString('token');
 
       final response = await http.get(
         url,
@@ -194,28 +215,9 @@ class _BudgetScreenState extends State<BudgetScreen> {
         final data = json.decode(response.body);
         List allTransactions = data['data'] ?? [];
 
-        // 🔒 Lọc transactions của user hiện tại
-        final List userTransactions = allTransactions.where((t) {
-          int? userId;
-          if (t['user'] is Map && t['user']['id'] != null) {
-            userId = t['user']['id'];
-          } else if (t['user'] is Map &&
-              t['user']['data'] is Map &&
-              t['user']['data']['id'] != null) {
-            userId = t['user']['data']['id'];
-          } else if (t['attributes'] is Map && t['attributes']['user'] is Map) {
-            userId = t['attributes']['user']['data']?['id'] ??
-                t['attributes']['user']['id'];
-          }
-          if (userId == null) return false;
-          return userId == myId;
-        }).toList();
-
-        // EXTRACT UNIQUE CATEGORIES TỪ USER TRANSACTIONS
-        Set<String> existingNames = danhSachNganSach.map((dm) => dm['ten'] as String).toSet();
-        Set<String> userTransactionCategories = {};
-
-        for (var gd in userTransactions) {
+        // EXTRACT UNIQUE CATEGORIES TỪ TRANSACTIONS
+        Set<String> uniqueCategories = {};
+        for (var gd in allTransactions) {
           final attrs = gd['attributes'] ?? gd;
           if (attrs['category'] != null) {
             var cat = attrs['category'];
@@ -226,96 +228,92 @@ class _BudgetScreenState extends State<BudgetScreen> {
               tenDM =
                   (cat['data']['attributes'] ?? cat['data'])['Name'] ?? 'Khác';
             }
-            userTransactionCategories.add(tenDM);
+            uniqueCategories.add(tenDM);
           }
         }
 
         debugPrint(
-          "📊 User transaction categories: ${userTransactionCategories.length}, existing: ${existingNames.length}",
+          "📊 Fallback: extracted ${uniqueCategories.length} categories from transactions",
         );
 
-        // 🔄 MERGE: Thêm categories từ transactions vào existing list (nếu chưa có)
-        List<Map<String, dynamic>> newCategories = [];
-        for (var tenDM in userTransactionCategories) {
-          if (!existingNames.contains(tenDM)) {
-            // Category mới - thêm vào
-            IconData icon = Icons.category_rounded;
-            Color mau = Colors.blueGrey;
-            String tenToLowerCase = tenDM.toLowerCase();
+        List<Map<String, dynamic>> dmTam = [];
+        for (var tenDM in uniqueCategories) {
+          IconData icon = Icons.category_rounded;
+          Color mau = Colors.blueGrey;
 
-            if (tenToLowerCase.contains('ăn') ||
-                tenToLowerCase.contains('cơm') ||
-                tenToLowerCase.contains('cà phê') ||
-                tenToLowerCase.contains('trà')) {
-              icon = Icons.fastfood_rounded;
-              mau = Colors.orange;
-            } else if (tenToLowerCase.contains('wifi') ||
-                tenToLowerCase.contains('điện') ||
-                tenToLowerCase.contains('nước') ||
-                tenToLowerCase.contains('xăng') ||
-                tenToLowerCase.contains('gas')) {
-              icon = Icons.bolt_rounded;
-              mau = Colors.amber;
-            } else if (tenToLowerCase.contains('nhật') ||
-                tenToLowerCase.contains('sinh') ||
-                tenToLowerCase.contains('quà') ||
-                tenToLowerCase.contains('kỷ niệm')) {
-              icon = Icons.cake_rounded;
-              mau = Colors.pink;
-            } else if (tenToLowerCase.contains('y tế') ||
-                tenToLowerCase.contains('sức khỏe') ||
-                tenToLowerCase.contains('bệnh') ||
-                tenToLowerCase.contains('thuốc') ||
-                tenToLowerCase.contains('bác sĩ')) {
-              icon = Icons.medical_services_rounded;
-              mau = Colors.red;
-            } else if (tenToLowerCase.contains('giải') ||
-                tenToLowerCase.contains('chơi') ||
-                tenToLowerCase.contains('game') ||
-                tenToLowerCase.contains('phim')) {
-              icon = Icons.sports_esports_rounded;
-              mau = Colors.purple;
-            } else if (tenToLowerCase.contains('học') ||
-                tenToLowerCase.contains('sách') ||
-                tenToLowerCase.contains('lớp') ||
-                tenToLowerCase.contains('nhạc')) {
-              icon = Icons.school_rounded;
-              mau = Colors.blue;
-            } else if (tenToLowerCase.contains('nhà') ||
-                tenToLowerCase.contains('trọ') ||
-                tenToLowerCase.contains('phòng')) {
-              icon = Icons.home_rounded;
-              mau = Colors.teal;
-            } else if (tenToLowerCase.contains('mua') ||
-                tenToLowerCase.contains('sắm') ||
-                tenToLowerCase.contains('quần áo') ||
-                tenToLowerCase.contains('đồ')) {
-              icon = Icons.shopping_bag_rounded;
-              mau = Colors.indigo;
-            } else if (tenToLowerCase.contains('xe') ||
-                tenToLowerCase.contains('xe buýt') ||
-                tenToLowerCase.contains('taxi') ||
-                tenToLowerCase.contains('tàu')) {
-              icon = Icons.directions_car_rounded;
-              mau = Colors.cyan;
-            }
+          // Auto-assign icons based on name (COMPREHENSIVE MATCHING)
+          String tenToLowerCase = tenDM.toLowerCase();
 
-            newCategories.add({
-              "ten": tenDM,
-              "daTieu": 0.0,
-              "hanMuc": 1000000.0,
-              "icon": icon,
-              "mauIcon": mau,
-            });
+          if (tenToLowerCase.contains('ăn') ||
+              tenToLowerCase.contains('cơm') ||
+              tenToLowerCase.contains('cà phê') ||
+              tenToLowerCase.contains('trà')) {
+            icon = Icons.fastfood_rounded;
+            mau = Colors.orange;
+          } else if (tenToLowerCase.contains('wifi') ||
+              tenToLowerCase.contains('điện') ||
+              tenToLowerCase.contains('nước') ||
+              tenToLowerCase.contains('xăng') ||
+              tenToLowerCase.contains('gas')) {
+            icon = Icons.bolt_rounded;
+            mau = Colors.amber;
+          } else if (tenToLowerCase.contains('nhật') ||
+              tenToLowerCase.contains('sinh') ||
+              tenToLowerCase.contains('quà') ||
+              tenToLowerCase.contains('kỷ niệm')) {
+            icon = Icons.cake_rounded;
+            mau = Colors.pink;
+          } else if (tenToLowerCase.contains('y tế') ||
+              tenToLowerCase.contains('sức khỏe') ||
+              tenToLowerCase.contains('bệnh') ||
+              tenToLowerCase.contains('thuốc') ||
+              tenToLowerCase.contains('bác sĩ')) {
+            icon = Icons.medical_services_rounded;
+            mau = Colors.red;
+          } else if (tenToLowerCase.contains('giải') ||
+              tenToLowerCase.contains('chơi') ||
+              tenToLowerCase.contains('game') ||
+              tenToLowerCase.contains('phim')) {
+            icon = Icons.sports_esports_rounded;
+            mau = Colors.purple;
+          } else if (tenToLowerCase.contains('học') ||
+              tenToLowerCase.contains('sách') ||
+              tenToLowerCase.contains('lớp') ||
+              tenToLowerCase.contains('nhạc')) {
+            icon = Icons.school_rounded;
+            mau = Colors.blue;
+          } else if (tenToLowerCase.contains('nhà') ||
+              tenToLowerCase.contains('trọ') ||
+              tenToLowerCase.contains('phòng')) {
+            icon = Icons.home_rounded;
+            mau = Colors.teal;
+          } else if (tenToLowerCase.contains('mua') ||
+              tenToLowerCase.contains('sắm') ||
+              tenToLowerCase.contains('quần áo') ||
+              tenToLowerCase.contains('đồ')) {
+            icon = Icons.shopping_bag_rounded;
+            mau = Colors.indigo;
+          } else if (tenToLowerCase.contains('xe') ||
+              tenToLowerCase.contains('xe buýt') ||
+              tenToLowerCase.contains('taxi') ||
+              tenToLowerCase.contains('tàu')) {
+            icon = Icons.directions_car_rounded;
+            mau = Colors.cyan;
           }
+
+          dmTam.add({
+            "ten": tenDM,
+            "daTieu": 0.0,
+            "hanMuc": 1000000.0,
+            "icon": icon,
+            "mauIcon": mau,
+          });
         }
 
         setState(() {
-          danhSachNganSach.addAll(newCategories);
+          danhSachNganSach = dmTam;
         });
-        debugPrint(
-          "✅ Merged ${newCategories.length} new categories from user transactions",
-        );
+        debugPrint("✅ Fallback categories loaded successfully");
       } else {
         debugPrint("❌ Fallback also failed: ${response.statusCode}");
         setState(() => _dangTai = false);
@@ -350,7 +348,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
     try {
       // 🔑 LẤY TOKEN
       String? token =
-          _prefs.getString('jwt') ?? _prefs.getString('token');
+          _prefs.getString('jwt_token') ?? _prefs.getString('token');
 
       // 🔑 GẮN TOKEN VÀO HEADER
       final response = await http.get(
@@ -428,6 +426,13 @@ class _BudgetScreenState extends State<BudgetScreen> {
           for (var nganSach in danhSachNganSach) {
             nganSach['daTieu'] = tienTheoDanhMuc[nganSach['ten']] ?? 0.0;
           }
+          
+          // 📊 Cập nhật thống kê tháng này
+          if (tongNganSach > 0) {
+            double phanTramVuot = (tongDaTieu / tongNganSach) - 1.0;
+            _prefs.setDouble('previousMonthOverage', phanTramVuot * 100);
+          }
+          
           _dangTai = false; // Tắt vòng xoay khi chạy xong
         });
       } else {
@@ -440,6 +445,155 @@ class _BudgetScreenState extends State<BudgetScreen> {
       debugPrint("Lỗi đồng bộ giao dịch: $e");
       setState(() => _dangTai = false);
     }
+  }
+
+  // --- KIỂM TRA CẢNH BÁO ---
+  List<Map<String, String>> _kiemTraCacCanhBao() {
+    List<Map<String, String>> canhBaoList = [];
+
+    // ⚠️ CẢNH BÁO 1: Tổng hạn mục > thu nhập
+    if (thuNhapThang > 0 && tongNganSach > thuNhapThang) {
+      double chenhLech = tongNganSach - thuNhapThang;
+      canhBaoList.add({
+        'type': 'income',
+        'icon': '⚠️',
+        'title': 'Hạn mục cao hơn thu nhập',
+        'message': 'Tổng hạn mục ${_formatTien(tongNganSach)} vượt thu nhập ${_formatTien(thuNhapThang)} (chênh lệch: +${_formatTien(chenhLech)})',
+        'color': 'orange',
+      });
+    }
+
+    // 🔴 CẢNH BÁO 2: Danh mục chưa custom set hạn mức
+    List<String> danh_muc_chua_set = [];
+    for (var ns in danhSachNganSach) {
+      if (ns['hanMuc'] == 1000000.0) {
+        danh_muc_chua_set.add(ns['ten']);
+      }
+    }
+    if (danh_muc_chua_set.isNotEmpty) {
+      canhBaoList.add({
+        'type': 'unconfigured',
+        'icon': '🔴',
+        'title': 'Danh mục chưa set hạn mức',
+        'message': 'Cần set hạn mức cho: ${danh_muc_chua_set.join(", ")}',
+        'color': 'red',
+      });
+    }
+
+    // 🔴 CẢNH BÁO 3: Chi tiêu vượt 1.2x hạn mục
+    if (tongNganSach > 0 && tongDaTieu > tongNganSach * 1.2) {
+      double vuotMucBao = tongDaTieu - (tongNganSach * 1.2);
+      canhBaoList.add({
+        'type': 'overspend',
+        'icon': '🔴',
+        'title': 'Chi tiêu vượt mức báo động',
+        'message': 'Đã vượt 20% hạn mục ${_formatTien(vuotMucBao)}. Kiểm tra lại chi tiêu!',
+        'color': 'red',
+      });
+    }
+
+    // 📊 CẢNH BÁO 4: So sánh với tháng trước
+    if (previousMonthOverage != 0) {
+      String so_sanh = previousMonthOverage > 0 ? 'vượt' : 'dưới';
+      canhBaoList.add({
+        'type': 'history',
+        'icon': '📊',
+        'title': 'Thống kê tháng trước',
+        'message': 'Tháng trước $so_sanh ${previousMonthOverage.abs().toStringAsFixed(1)}% hạn mức',
+        'color': 'blue',
+      });
+    }
+
+    return canhBaoList;
+  }
+
+  // --- CHỈNH SỬA THU NHẬP ---
+  void _hienThiBangChinhSuaThuNhap() {
+    TextEditingController controller = TextEditingController(
+      text: thuNhapThang > 0
+          ? NumberFormat('#,###', 'vi_VN').format(thuNhapThang).replaceAll(',', '.')
+          : '',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Thu nhập/tháng',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueAccent,
+                ),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Nhập để so sánh với hạn mục',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 25),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Thu nhập VNĐ',
+                  prefixIcon: const Icon(Icons.attach_money, color: Colors.green),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 55),
+                  backgroundColor: Colors.blueAccent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                onPressed: () async {
+                  String chuoiSoSanh = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+                  double val = double.tryParse(chuoiSoSanh) ?? 0.0;
+                  await _prefs.setDouble('thuNhapThang', val);
+                  setState(() => thuNhapThang = val);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✨ Đã lưu thu nhập!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                },
+                child: const Text(
+                  'Lưu',
+                  style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // --- BẢNG TÙY CHỈNH HẠN MỨC ---
@@ -722,31 +876,121 @@ class _BudgetScreenState extends State<BudgetScreen> {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        const Text(
-                          'Chi tiết hạng mục',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                  // 🚨 HIỂN THỊ CÁC CẢNH BÁO
+                      ..._kiemTraCacCanhBao().map((warning) {
+                        Color bgColor = Colors.orange.shade50;
+                        Color borderColor = Colors.orange;
+                        if (warning['color'] == 'red') {
+                          bgColor = Colors.red.shade50;
+                          borderColor = Colors.red;
+                        } else if (warning['color'] == 'blue') {
+                          bgColor = Colors.blue.shade50;
+                          borderColor = Colors.blue;
+                        }
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            border: Border.all(color: borderColor, width: 1.5),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(warning['icon']!, style: const TextStyle(fontSize: 18)),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      warning['title']!,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: borderColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                warning['message']!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                  height: 1.4,
+                                ),
+                              ),
+                              if (warning['type'] == 'income')
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: ElevatedButton(
+                                    onPressed: _hienThiBangChinhSuaThuNhap,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: borderColor,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    ),
+                                    child: const Text(
+                                      'Chỉnh sửa thu nhập',
+                                      style: TextStyle(fontSize: 11, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                      const SizedBox(height: 10),
+
+                      // 💰 NÚT CHỈNH SỬA THU NHẬP
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: ElevatedButton.icon(
+                          onPressed: _hienThiBangChinhSuaThuNhap,
+                          icon: const Icon(Icons.attach_money, size: 18),
+                          label: Text(
+                            thuNhapThang > 0
+                                ? 'Thu nhập: ${_formatTien(thuNhapThang)}'
+                                : 'Set Thu nhập',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade600,
+                            minimumSize: const Size(double.infinity, 45),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
-                        const Spacer(),
-                        TextButton.icon(
-                          onPressed: danhSachNganSach.isEmpty
-                              ? null
-                              : _hienThiBangSuaHanMuc,
-                          icon: const Icon(Icons.edit_rounded, size: 18),
-                          label: const Text(
-                            'Chỉnh sửa',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
+                      ),
+                      const SizedBox(height: 15),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            const Text(
+                              'Chi tiết hạng mục',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: danhSachNganSach.isEmpty
+                                  ? null
+                                  : _hienThiBangSuaHanMuc,
+                              icon: const Icon(Icons.edit_rounded, size: 18),
+                              label: const Text(
+                                'Chỉnh sửa',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
                   if (danhSachNganSach.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(30),
