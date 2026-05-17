@@ -22,7 +22,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isDarkMode = false;
   // --- NHÀ MÁY SẢN XUẤT EXCEL ---
   Future<void> _xuatBaoCaoExcel() async {
-    // 1. Hiện vòng xoay loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -30,19 +29,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     try {
-      int? myId = userIdGlobal.value;
-      debugPrint("📋 Excel Export - User ID: $myId");
-
       final prefs = await SharedPreferences.getInstance();
       String? token =
           userTokenGlobal.value ??
           prefs.getString('jwt') ??
           prefs.getString('token');
 
-      debugPrint("📋 Token available: ${token != null}");
-
-      // 3. LẤY DANH SÁCH GIAO DỊCH TỪ STRAPI
-      // Backend sẽ filter theo JWT token tự động, không cần client-side filter
       final url = Uri.parse(
         'http://139.59.242.7:1337/api/transactions?pagination[pageSize]=5000&populate=category',
       );
@@ -55,30 +47,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         },
       );
 
-      debugPrint("📋 API Response Code: ${response.statusCode}");
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         List giaoDich = data['data'] ?? [];
-        debugPrint("📋 Total transactions from API: ${giaoDich.length}");
 
         if (giaoDich.isEmpty) {
           if (mounted) Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Không có dữ liệu giao dịch để xuất!"),
+              content: Text("Không có dữ liệu giao dịch để xuất"),
               backgroundColor: Colors.orange,
             ),
           );
           return;
         }
 
-        // 4. KHỞI TẠO FILE EXCEL
         var excel = Excel.createExcel();
         Sheet sheetObject = excel['Báo cáo chi tiêu'];
         excel.setDefaultSheet('Báo cáo chi tiêu');
 
-        // KẺ DÒNG TIÊU ĐỀ (HEADER)
         sheetObject.appendRow([
           TextCellValue('Ngày tháng'),
           TextCellValue('Danh mục'),
@@ -86,24 +73,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextCellValue('Ghi chú'),
         ]);
 
-        // ĐỔ DỮ LIỆU VÀO TỪNG DÒNG
         int rowCount = 0;
         for (var gd in giaoDich) {
           try {
             final attrs = gd['attributes'] ?? gd;
 
-            // Lấy Ngày
             String ngay = 'N/A';
             if (attrs['date'] != null) {
               try {
                 DateTime dt = DateTime.parse(attrs['date']).toLocal();
                 ngay = DateFormat('dd/MM/yyyy HH:mm').format(dt);
-              } catch (e) {
-                debugPrint("⚠️ Date parse error: $e");
-              }
+              } catch (e) {}
             }
 
-            // Lấy Tên Danh Mục
             String tenDM = 'Khác';
             if (attrs['category'] != null) {
               var cat = attrs['category'];
@@ -116,11 +98,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }
             }
 
-            // Lấy Tiền và Ghi chú
             double tien = (attrs['amount'] ?? 0).toDouble();
             String note = attrs['note'] ?? '';
 
-            // Ghi vào dòng mới
             sheetObject.appendRow([
               TextCellValue(ngay),
               TextCellValue(tenDM),
@@ -129,95 +109,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]);
             
             rowCount++;
-            debugPrint("📋 Row $rowCount: $ngay | $tenDM | $tien | $note");
           } catch (e) {
-            debugPrint("⚠️ Error processing row: $e");
             continue;
           }
         }
 
-        debugPrint("📋 Rows written to Excel: $rowCount");
-
-        if (rowCount == 0) {
-          if (mounted) Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Không thể xử lý dữ liệu giao dịch!"),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-
-        // 5. LƯU FILE VÀO BỘ NHỚ TẠM (không cần plugin path_provider)
         var fileBytes = excel.save();
         if (fileBytes == null) {
-          throw Exception("Excel save returned null");
+          throw Exception("Excel save failed");
         }
 
-        try {
-          // Dùng Directory.systemTemp từ dart:io (không cần plugin)
-          final tempDir = Directory.systemTemp;
-          final fileName = 'BaoCaoChiTieu_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-          final file = File('${tempDir.path}/$fileName');
-          
-          await file.writeAsBytes(fileBytes);
-          
-          if (mounted) Navigator.pop(context); // Đóng loading
+        final tempDir = Directory.systemTemp;
+        final fileName = 'BaoCaoChiTieu_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(fileBytes);
+        
+        if (mounted) Navigator.pop(context);
 
-          // 6. HIỆN SNACKBAR THÀNH CÔNG
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Đã xuất báo cáo $rowCount giao dịch thành công'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-
-          // 7. MỞ HỘP THOẠI SHARE
-          await Future.delayed(const Duration(milliseconds: 300));
-          
-          if (await file.exists()) {
-            await Share.shareXFiles(
-              [XFile(file.path)],
-              text: 'Báo cáo chi tiêu từ Smart AI Budget - $rowCount giao dịch',
-            );
-          }
-        } catch (e) {
-          if (mounted) Navigator.pop(context);
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Không thể lưu file. Thử lại sau"),
-              backgroundColor: Colors.red,
+            SnackBar(
+              content: Text('Đã xuất báo cáo $rowCount giao dịch thành công'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
             ),
+          );
+        }
+
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        if (await file.exists()) {
+          await Share.shareXFiles(
+            [XFile(file.path)],
+            text: 'Báo cáo chi tiêu từ Smart AI Budget - $rowCount giao dịch',
           );
         }
       } else {
         if (mounted) Navigator.pop(context);
-        debugPrint("📋 API Error: ${response.statusCode}");
-        debugPrint("📋 Response body: ${response.body}");
-        
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              "Lỗi lấy dữ liệu (${response.statusCode}). Kiểm tra kết nối!",
-            ),
+          const SnackBar(
+            content: Text("Không thể tải dữ liệu"),
             backgroundColor: Colors.red,
           ),
         );
       }
     } catch (e) {
       if (mounted) Navigator.pop(context);
-      debugPrint("📋 Excel Export Error: $e");
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Lỗi xuất file: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
